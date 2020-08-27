@@ -1,3 +1,4 @@
 Pillow
 ipython
 numpy
+click
