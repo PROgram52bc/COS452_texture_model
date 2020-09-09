@@ -98,11 +98,12 @@ def read_image(path):
     return Image.open(path)
 
 
-def write_image(image, path, override=True, verbose=True):
+def write_image(image, path, post_processors=[], override=True, verbose=True):
     """read an image
 
     :image: the image to be written as a PIL.Image object
     :path: the path to the image
+    :post_processors: the processors to apply to the image before writing to the disk
     :override: override existing files
     :verbose: print output regarding writing status
     :returns: None
@@ -116,6 +117,8 @@ def write_image(image, path, override=True, verbose=True):
         else:
             if verbose:
                 click.echo(f"overriding image at {path}")
+    for p in post_processors:
+        image = p(image)
     image.save(path)
     if verbose:
         click.echo(f"successfully write to {path}")
@@ -137,10 +140,10 @@ def get_existing_path(path, extensions=['jpg', 'jpeg', 'png']):
     return None
 
 
-def rmdir(path, dryrun=False, verbose=True, rmself=True):
+def rm(path, dryrun=False, verbose=True):
     """ remove the file, or recursively remove directories
 
-    :path: the path to the file
+    :path: the path to the file or directory
     :dryrun: don't actually remove the file
     :verbose: print out files/directories that will be removed
     :returns: None
@@ -156,19 +159,40 @@ def rmdir(path, dryrun=False, verbose=True, rmself=True):
             else:
                 os.rmdir(item)
 
-    for root, directories, files in os.walk(path, topdown=False):
-        # remove files
-        for name in files:
-            full_name = os.path.join(root, name)
-            _rm(full_name, is_file=True)
-        # remove directories
-        for name in directories:
-            full_name = os.path.join(root, name)
-            _rm(full_name)
-    # remove the directory itself
-    _rm(path)
+    if os.path.isfile(path):
+        _rm(path, is_file=True)
+    elif os.path.isdir(path):
+        for root, directories, files in os.walk(path, topdown=False):
+            # remove files
+            for name in files:
+                full_name = os.path.join(root, name)
+                _rm(full_name, is_file=True)
+            # remove directories
+            for name in directories:
+                full_name = os.path.join(root, name)
+                _rm(full_name, is_file=False)
+        # remove the directory itself
+        if rmself:
+            _rm(path, is_file=False)
+    else:
+        raise ValueError(f"{path} does not point to a file or directory")
+
 
 # --- transform utilities
+
+
+def read_orig(category):
+    """read the original image for a certain category
+
+    :category: the category to be read
+    :returns: the Image object
+
+    """
+    orig_path = get_existing_path(os.path.join(*image_dir, category, 'orig'))
+    if not orig_path:
+        raise ModuleError(f"no orig image found in category {category}")
+    orig = read_image(orig_path)
+    return orig
 
 
 def transform_image(image, transformation, level):
@@ -198,7 +222,7 @@ def transform_image_by_category(
         extension='jpg',
         override=True,
         verbose=True,
-        circle=True):
+        post_processors=[]):
     """ transform the image of a certain category
 
     :category: the category to be transformed, assumes that it is a valid category
@@ -208,14 +232,9 @@ def transform_image_by_category(
     :returns: None
 
     """
-    orig_path = get_existing_path(os.path.join(*image_dir, category, 'orig'))
-    if not orig_path:
-        raise ModuleError(f"no orig image found in category {category}")
-    orig = read_image(orig_path)
+    orig = read_orig(category)
     for level in levels:
         out = transform_image(orig, transformation, level)
-        if circle:
-            out = crop_to_circle(out)
         out_path = os.path.join(*image_dir, category, transformation)
         os.makedirs(out_path, exist_ok=True)
         out_path = os.path.join(
@@ -223,7 +242,12 @@ def transform_image_by_category(
             f"level_{level}" +
             os.extsep +
             extension)
-        write_image(out, out_path, override=override, verbose=verbose)
+        write_image(
+            out,
+            out_path,
+            post_processors=post_processors,
+            override=override,
+            verbose=verbose)
 
 # --- info utilities
 
@@ -277,7 +301,7 @@ def analyze():
               callback=validate_transformations)
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
-@click.option("--crop-to-circle/--no-crop-to-circle", "circle", default=True)
+@click.option("--circle/--no-circle", "circle", default=True)
 def all(categories, transformations, verbose, override, circle):
     """ transform all existing images with all available transformations
     if category is given, transform only the specified categories
@@ -285,15 +309,23 @@ def all(categories, transformations, verbose, override, circle):
     """
     print("categories: {}".format(categories))
     print("transformations: {}".format(transformations))
+    post_processors = []
+    if circle:
+        post_processors.append(crop_to_circle)
 
     for category in categories:
+        # generate the unmodified reference image
+        orig = read_orig(category)
+        out_path = os.path.join(*image_dir, category, "output.jpg")
+        write_image(orig, out_path, post_processors=post_processors, override=override, verbose=verbose)
+
         for transformation in transformations:
             transform_image_by_category(
                 category,
                 transformation,
+                post_processors=post_processors,
                 override=override,
-                verbose=verbose,
-                circle=circle)
+                verbose=verbose)
 
 
 @transform.command()
@@ -314,10 +346,13 @@ def all(categories, transformations, verbose, override, circle):
 def clean(categories, transformations, dryrun, verbose):
     """ clean transformed images """
     for category in categories:
+        output_path = os.path.join(*image_dir, category, "output.jpg")
+        if os.path.isfile(output_path):
+            rm(output_path, dryrun=dryrun, verbose=verbose)
         for transformation in transformations:
-            path = os.path.join(*image_dir, category, transformation)
-            if os.path.isdir(path):
-                rmdir(path, dryrun=dryrun, verbose=verbose)
+            transformation_path = os.path.join(*image_dir, category, transformation)
+            if os.path.isdir(transformation_path):
+                rm(path, dryrun=dryrun, verbose=verbose)
 
 # --- analyze commands
 
