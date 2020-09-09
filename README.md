@@ -8,13 +8,16 @@
 
 	-   `<category>/`\*: contains a certain category of image. For
 		example, 'brick,' 'wheat,' etc.
-		-   `orig.jpg`: the original image
+		-   `orig.jpg`: the original image; everything else in this directory is
+			derived from this image.
+		-   `output.jpg`: the output image without being transformed with any
+			specific transformation.
 		-   `<transformation>/`\*: contains images that are transformed
 			from the original image with a certain transformation. For
 			example, 'crop,' 'watermark,' etc.
-			-   `level_[1-9].jpg`\*: images transformed with different
-				intensity with the particular `<transformation>`. Level
-				1 is the least transformed.
+			-   `level_[0-10].jpg`\*: images transformed with different
+				intensity with the particular `<transformation>`. Level 0 is
+				identical to `output.jpg`, and Level 10 is the most transformed.
 
 -   `data/`: contains analysis data
 	-   `rank.yaml`: contains rank output data in the following form
@@ -31,8 +34,9 @@
 		-   `<transformation>/`\*: represents a transformatio.For
 			example, blur.
 			-   `__init__.py`: contains a `transform(img, level): img`
-				public function to transform a given image with the
-				given `level`.
+				public function to transform a given image with the given
+				`level`. The function should ensure that when `level` is 0, the
+				image returned is identical to the image passed to it.
 
 	-   `analysis/`: contains code to calculate ranks based on different
 		metrics

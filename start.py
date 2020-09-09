@@ -3,6 +3,7 @@ import click
 import os
 import importlib # for dynamic import
 from PIL import Image
+from src.utils.helpers import crop_to_circle
 
 # --- constants
 
@@ -161,7 +162,7 @@ def transform_image(image, transformation, level):
     new_image = transform(image, level)
     return new_image
 
-def transform_image_by_category(category, transformation, levels=range(10), extension='jpg', override=True, verbose=True):
+def transform_image_by_category(category, transformation, levels=range(11), extension='jpg', override=True, verbose=True, circle=True):
     """ transform the image of a certain category
 
     :category: the category to be transformed, assumes that it is a valid category
@@ -177,6 +178,8 @@ def transform_image_by_category(category, transformation, levels=range(10), exte
     orig = read_image(orig_path)
     for level in levels:
         out = transform_image(orig, transformation, level)
+        if circle:
+            out = crop_to_circle(out)
         out_path = os.path.join(*image_dir, category, transformation)
         os.makedirs(out_path, exist_ok=True)
         out_path = os.path.join(out_path, f"level_{level}" + os.extsep + extension)
@@ -218,7 +221,8 @@ def analyze():
 @click.option("-t", "--transformation", "transformations", default=get_transformation_names(), multiple=True, callback=validate_transformations)
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
-def all(categories, transformations, verbose, override):
+@click.option("--crop-to-circle/--no-crop-to-circle", "circle", default=True)
+def all(categories, transformations, verbose, override, circle):
     """ transform all existing images with all available transformations 
     if category is given, transform only the specified categories
     if transformation is given, transform with only the specified transformations
@@ -228,7 +232,7 @@ def all(categories, transformations, verbose, override):
     
     for category in categories:
         for transformation in transformations:
-            transform_image_by_category(category, transformation, override=override, verbose=verbose)
+            transform_image_by_category(category, transformation, override=override, verbose=verbose, circle=circle)
 
 @transform.command()
 @click.option("-c", "--category", "categories", default=get_image_category_names(), multiple=True, callback=validate_image_categories)
