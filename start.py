@@ -317,7 +317,12 @@ def all(categories, transformations, verbose, override, circle):
         # generate the unmodified reference image
         orig = read_orig(category)
         out_path = os.path.join(*image_dir, category, "output.jpg")
-        write_image(orig, out_path, post_processors=post_processors, override=override, verbose=verbose)
+        write_image(
+            orig,
+            out_path,
+            post_processors=post_processors,
+            override=override,
+            verbose=verbose)
 
         for transformation in transformations:
             transform_image_by_category(
@@ -350,7 +355,8 @@ def clean(categories, transformations, dryrun, verbose):
         if os.path.isfile(output_path):
             rm(output_path, dryrun=dryrun, verbose=verbose)
         for transformation in transformations:
-            transformation_path = os.path.join(*image_dir, category, transformation)
+            transformation_path = os.path.join(
+                *image_dir, category, transformation)
             if os.path.isdir(transformation_path):
                 rm(path, dryrun=dryrun, verbose=verbose)
 
