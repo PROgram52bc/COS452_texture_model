@@ -172,8 +172,7 @@ def rm(path, dryrun=False, verbose=True):
                 full_name = os.path.join(root, name)
                 _rm(full_name, is_file=False)
         # remove the directory itself
-        if rmself:
-            _rm(path, is_file=False)
+        _rm(path, is_file=False)
     else:
         raise ValueError(f"{path} does not point to a file or directory")
 
@@ -199,7 +198,7 @@ def transform_image(image, transformation, level):
     """ transforms an image
     :image: the image to be transformed
     :transformation: transformation name. E.g. rotate
-    :level: integer from 1 to 9
+    :level: integer from 0 to 10
     :returns: the transformed image
     """
     if transformation not in get_transformation_names():
@@ -239,7 +238,7 @@ def transform_image_by_category(
         os.makedirs(out_path, exist_ok=True)
         out_path = os.path.join(
             out_path,
-            f"level_{level}" +
+            f"level_{level:02}" +
             os.extsep +
             extension)
         write_image(
@@ -358,7 +357,7 @@ def clean(categories, transformations, dryrun, verbose):
             transformation_path = os.path.join(
                 *image_dir, category, transformation)
             if os.path.isdir(transformation_path):
-                rm(path, dryrun=dryrun, verbose=verbose)
+                rm(transformation_path, dryrun=dryrun, verbose=verbose)
 
 # --- analyze commands
 
