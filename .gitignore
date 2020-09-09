@@ -2,3 +2,5 @@ venv
 __pycache__
 *.swp
 *.swo
+images/*
+tags
