@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw
 
-def crop_to_circle(img, max_radius=256, bg_color=(0,0,0)):
+
+def crop_to_circle(img, max_radius=256, bg_color=(0, 0, 0)):
     """ crop the given image into a circle.
 
     :img: the image to be img
@@ -12,7 +13,7 @@ def crop_to_circle(img, max_radius=256, bg_color=(0,0,0)):
 
     """
     width, height = img.size
-    radius = min(max_radius, width//2, height//2)
+    radius = min(max_radius, width // 2, height // 2)
     # crop the given image
     x1 = width // 2 - radius
     x2 = width // 2 + radius
@@ -23,7 +24,7 @@ def crop_to_circle(img, max_radius=256, bg_color=(0,0,0)):
     # create mask
     mask = Image.new("1", img.size, 0)
     draw = ImageDraw.Draw(mask)
-    draw.ellipse((0,0,radius*2,radius*2), 1)
+    draw.ellipse((0, 0, radius * 2, radius * 2), 1)
     # create background image
     bg = Image.new("RGB", img.size, bg_color)
     # merge the images together

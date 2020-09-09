@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import click
 import os
-import importlib # for dynamic import
+import importlib  # for dynamic import
 from PIL import Image
 from src.utils.helpers import crop_to_circle
 
@@ -13,11 +13,13 @@ image_dir = ['images']
 
 # --- exceptions
 
+
 class ModuleError(Exception):
     """ when a module is not implemented according to the specification """
     pass
 
 # --- utilities
+
 
 def validate_image_categories(ctx, param, value):
     """ makes sure that the given image categories are valid """
@@ -26,46 +28,65 @@ def validate_image_categories(ctx, param, value):
         raise ValueError(f"Invalid image categories: {invalid_categories}")
     return value
 
+
 def validate_transformations(ctx, param, value):
     """ makes sure that the given image transformations are valid """
     invalid_transformations = set(value) - set(get_transformation_names())
     if invalid_transformations:
-        raise ValueError(f"Invalid image transformations: {invalid_transformations}")
+        raise ValueError(
+            f"Invalid image transformations: {invalid_transformations}")
     return value
 
-def ls(directory=None, filtr=lambda item:True, mapper=lambda item:item):
+
+def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
     """returns a list of strings of each file/directories in _directory_
     The strings will be relative to the current directory
 
     :directory: the directory to list, defaults to the current directory
     :filtr: the filter function to apply on each returned element
     :mapper: the mapper function to transform each returned element, applied after filter function
-    :returns: a list of strings 
+    :returns: a list of strings
     """
     items = os.listdir(directory)
     if directory:
-        items = map(lambda item:os.path.join(directory, item), items)
+        items = map(lambda item: os.path.join(directory, item), items)
     items = filter(filtr, items)
     items = map(mapper, items)
     return list(items)
+
 
 def get_image_category_names():
     """gets all existing image categories
     :returns: a list of category names
     """
-    return ls(os.path.join(*image_dir), filtr=os.path.isdir, mapper=os.path.basename)
+    return ls(
+        os.path.join(
+            *image_dir),
+        filtr=os.path.isdir,
+        mapper=os.path.basename)
+
 
 def get_transformation_names():
     """gets all available transformations
     :returns: a list of names of transformation
     """
-    return ls(os.path.join(*transformation_dir), filtr=os.path.isdir, mapper=os.path.basename)
+    return ls(
+        os.path.join(
+            *transformation_dir),
+        filtr=os.path.isdir,
+        mapper=os.path.basename)
+
 
 def get_analysis_names():
     """gets all available analysis metrics
     :returns: a list of names of analysis method
     """
-    return ls(os.path.join(*analysis_dir), filtr=os.path.isdir, mapper=os.path.basename)
+    return ls(
+        os.path.join(
+            *analysis_dir),
+        filtr=os.path.isdir,
+        mapper=os.path.basename)
+
 
 def read_image(path):
     """read an image
@@ -75,6 +96,7 @@ def read_image(path):
 
     """
     return Image.open(path)
+
 
 def write_image(image, path, override=True, verbose=True):
     """read an image
@@ -98,7 +120,8 @@ def write_image(image, path, override=True, verbose=True):
     if verbose:
         click.echo(f"successfully write to {path}")
 
-def get_existing_path(path, extensions=['jpg','jpeg','png']):
+
+def get_existing_path(path, extensions=['jpg', 'jpeg', 'png']):
     """
 
     :path: the path to a file
@@ -107,11 +130,12 @@ def get_existing_path(path, extensions=['jpg','jpeg','png']):
 
     """
     path_root = os.path.splitext(path)[0]
-    options = [path] + [ path_root + os.extsep + ext for ext in extensions ]
+    options = [path] + [path_root + os.extsep + ext for ext in extensions]
     for option in options:
         if os.path.isfile(option):
             return option
     return None
+
 
 def rmdir(path, dryrun=False, verbose=True, rmself=True):
     """ remove the file, or recursively remove directories
@@ -146,6 +170,7 @@ def rmdir(path, dryrun=False, verbose=True, rmself=True):
 
 # --- transform utilities
 
+
 def transform_image(image, transformation, level):
     """ transforms an image
     :image: the image to be transformed
@@ -154,15 +179,26 @@ def transform_image(image, transformation, level):
     :returns: the transformed image
     """
     if transformation not in get_transformation_names():
-        raise ValueError(f"transformation with name {transformation} is not available")
-    mod = importlib.import_module('.'.join([*transformation_dir, transformation]))
+        raise ValueError(
+            f"transformation with name {transformation} is not available")
+    mod = importlib.import_module(
+        '.'.join([*transformation_dir, transformation]))
     transform = getattr(mod, 'transform', None)
     if not transform:
-        raise ModuleError(f"no transform function implemented in transformation module {transformation}")
+        raise ModuleError(
+            f"no transform function implemented in transformation module {transformation}")
     new_image = transform(image, level)
     return new_image
 
-def transform_image_by_category(category, transformation, levels=range(11), extension='jpg', override=True, verbose=True, circle=True):
+
+def transform_image_by_category(
+        category,
+        transformation,
+        levels=range(11),
+        extension='jpg',
+        override=True,
+        verbose=True,
+        circle=True):
     """ transform the image of a certain category
 
     :category: the category to be transformed, assumes that it is a valid category
@@ -182,10 +218,15 @@ def transform_image_by_category(category, transformation, levels=range(11), exte
             out = crop_to_circle(out)
         out_path = os.path.join(*image_dir, category, transformation)
         os.makedirs(out_path, exist_ok=True)
-        out_path = os.path.join(out_path, f"level_{level}" + os.extsep + extension)
+        out_path = os.path.join(
+            out_path,
+            f"level_{level}" +
+            os.extsep +
+            extension)
         write_image(out, out_path, override=override, verbose=verbose)
 
 # --- info utilities
+
 
 def plist(lst, indent="", sep="\n"):
     """print a list
@@ -193,22 +234,26 @@ def plist(lst, indent="", sep="\n"):
     :indent: characters to append before each item
     :sep: characters used to separate items
     """
-    s = sep.join([ indent + item for item in lst ])
+    s = sep.join([indent + item for item in lst])
     click.echo(s)
 
 # --- commands
+
 
 @click.group()
 def cli():
     pass
 
+
 @cli.group()
 def info():
     pass
 
+
 @cli.group()
 def transform():
     pass
+
 
 @cli.group()
 def analyze():
@@ -216,27 +261,54 @@ def analyze():
 
 # --- transform commands
 
+
 @transform.command()
-@click.option("-c", "--category", "categories", default=get_image_category_names(), multiple=True, callback=validate_image_categories)
-@click.option("-t", "--transformation", "transformations", default=get_transformation_names(), multiple=True, callback=validate_transformations)
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
 @click.option("--crop-to-circle/--no-crop-to-circle", "circle", default=True)
 def all(categories, transformations, verbose, override, circle):
-    """ transform all existing images with all available transformations 
+    """ transform all existing images with all available transformations
     if category is given, transform only the specified categories
     if transformation is given, transform with only the specified transformations
     """
     print("categories: {}".format(categories))
     print("transformations: {}".format(transformations))
-    
+
     for category in categories:
         for transformation in transformations:
-            transform_image_by_category(category, transformation, override=override, verbose=verbose, circle=circle)
+            transform_image_by_category(
+                category,
+                transformation,
+                override=override,
+                verbose=verbose,
+                circle=circle)
+
 
 @transform.command()
-@click.option("-c", "--category", "categories", default=get_image_category_names(), multiple=True, callback=validate_image_categories)
-@click.option("-t", "--transformation", "transformations", default=get_transformation_names(), multiple=True, callback=validate_transformations)
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
 @click.option("--dryrun/--no-dryrun", default=False)
 @click.option("--verbose/--silent", default=True)
 def clean(categories, transformations, dryrun, verbose):
@@ -250,6 +322,8 @@ def clean(categories, transformations, dryrun, verbose):
 # --- analyze commands
 
 # --- info commands
+
+
 @info.command()
 def all():
     click.echo("Image categories:")
@@ -258,6 +332,7 @@ def all():
     plist(get_transformation_names(), indent="\t")
     click.echo("Analyses:")
     plist(get_analysis_names(), indent="\t")
+
 
 if __name__ == '__main__':
     cli()

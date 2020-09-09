@@ -1,6 +1,7 @@
 from matplotlib.pyplot import imread
 import numpy as np
 
+
 def rank(img_map, img_orig):
     """A function to rank images according to the MSE metric
 
@@ -14,11 +15,12 @@ def rank(img_map, img_orig):
     for img_key in img_map:
         img_name = img_map[img_key]
         image = imread(img_name)
-        error = ((image-orig)**2).mean()
+        error = ((image - orig)**2).mean()
         errors.append((img_key, error))
 
-    errors.sort(key=lambda t:t[1])
-    return [ error[0] for error in errors ]
+    errors.sort(key=lambda t: t[1])
+    return [error[0] for error in errors]
+
 
 def main():
     from os import path
@@ -43,7 +45,7 @@ def main():
         image_orig = image_map['orig']
         # delete the original
         del image_map['orig']
-        
+
         result = rank(image_map, image_orig)
         ranks.update({image_set_name: result})
     print("ranks: {}".format(ranks))
@@ -51,6 +53,7 @@ def main():
     # overwrite the file
     with open(path.join(path.dirname(__file__), 'rank.yaml'), "w") as f:
         f.write(safe_dump(ranks, default_flow_style=False))
+
 
 if __name__ == "__main__":
     main()
