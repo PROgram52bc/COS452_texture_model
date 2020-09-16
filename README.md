@@ -19,6 +19,11 @@
 				intensity with the particular `<transformation>`. Level 0 is
 				identical to `output.jpg`, and Level 10 is the most transformed.
 
+-   `printables/`: contains the transformed images in printable format
+	(currently only pdf format)
+	-   `<category>_<transformation>.pdf`\*: the file containing all levels of
+		transformed images in `<category>` transformed using `<transformation>`
+
 -   `data/`: contains analysis data
 	-   `rank.yaml`: contains rank output data in the following form
 		- `<category>/`\*

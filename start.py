@@ -3,13 +3,17 @@ import click
 import os
 import importlib  # for dynamic import
 from PIL import Image
-from src.utils.helpers import crop_to_circle
+from fpdf import FPDF
+
+from src.utils.helpers import crop_to_circle, add_orientation_marker
+from src.utils.pdf import lay_images
 
 # --- constants
 
 transformation_dir = ['src', 'transformations']
 analysis_dir = ['src', 'analysis']
 image_dir = ['images']
+printable_dir = ['printables']
 
 # --- exceptions
 
@@ -282,6 +286,10 @@ def transform():
 def analyze():
     pass
 
+@cli.group()
+def printable():
+    pass
+
 # --- transform commands
 
 
@@ -301,18 +309,23 @@ def analyze():
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
 @click.option("--circle/--no-circle", "circle", default=True)
-def all(categories, transformations, verbose, override, circle):
+@click.option("--orientation-mark/--no-orientation-mark", "orientation", default=True)
+def all(categories, transformations, verbose, override, circle, orientation):
     """ transform all existing images with all available transformations
     if category is given, transform only the specified categories
     if transformation is given, transform with only the specified transformations
+    by default, images will be cropped into a circle, can override this behavior with --no-circle
+    if images are cropped, an orientation mark will by default be added, override this behavior with --no-orientation-mark
     """
-    print("categories: {}".format(categories))
-    print("transformations: {}".format(transformations))
     post_processors = []
     if circle:
         post_processors.append(crop_to_circle)
+        if orientation:
+            post_processors.append(add_orientation_marker)
 
     for category in categories:
+        if verbose:
+            click.echo(f"Processing category {category}...")
         # generate the unmodified reference image
         orig = read_orig(category)
         out_path = os.path.join(*image_dir, category, "output.jpg")
@@ -324,6 +337,8 @@ def all(categories, transformations, verbose, override, circle):
             verbose=verbose)
 
         for transformation in transformations:
+            if verbose:
+                click.echo(f"Transforming with {transformation}...")
             transform_image_by_category(
                 category,
                 transformation,
@@ -350,9 +365,11 @@ def all(categories, transformations, verbose, override, circle):
 def clean(categories, transformations, dryrun, verbose):
     """ clean transformed images """
     for category in categories:
+        # remove the reference output image
         output_path = os.path.join(*image_dir, category, "output.jpg")
         if os.path.isfile(output_path):
             rm(output_path, dryrun=dryrun, verbose=verbose)
+        # remove images under each transformation
         for transformation in transformations:
             transformation_path = os.path.join(
                 *image_dir, category, transformation)
@@ -360,6 +377,78 @@ def clean(categories, transformations, dryrun, verbose):
                 rm(transformation_path, dryrun=dryrun, verbose=verbose)
 
 # --- analyze commands
+
+# --- printable utilities
+
+def read_level_image_paths(category, transformation):
+    """read the transformed image for a certain category
+
+    :category: the category to be read
+    :transformation: the specific transformation
+    :returns: an array of image paths that exist
+
+    """
+    base_path = os.path.join(*image_dir, category, transformation)
+    level_paths = [ get_existing_path(os.path.join(base_path, f"level_{level:02}")) for level in range(0,11) ]
+    # level_images = [ read_image(path) for path in level_paths if path ]
+    return list(filter(None, level_paths))
+
+
+# --- printable commands
+
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
+@click.option("--verbose/--silent", default=True)
+@printable.command()
+def all(categories, transformations, verbose):
+    """ generate printable files with the transformed images """
+    os.makedirs(os.path.join(*printable_dir), exist_ok=True)
+    for category in categories:
+        for transformation in transformations:
+            # read available level images
+            image_paths = read_level_image_paths(category, transformation)
+            if len(image_paths) == 0:
+                if verbose:
+                    click.echo(f"Skip {category}, {transformation}, no level images found")
+                continue
+            if verbose:
+                click.echo(f"Generating printable for {category}, {transformation}...")
+            # generating pdf
+            pdf = FPDF(orientation="L", unit="pt", format="letter")
+            pdf.set_auto_page_break(False)
+            pdf.set_margins(10,10,10)
+            pdf.set_font('Arial', 'B', 20)
+            pdf.add_page()
+            pdf.cell(pdf.w, 30, f"Category: {category}; Transformation: {transformation}", border=0, ln=1, align="C")
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(pdf.w, 30, 
+                    f"Images to be sorted first from left to right, then from top to bottom. From level_0 to level_10", 
+                    border=0, ln=1, align="C")
+            lay_images(pdf, image_paths, width=240, space=10)
+            output_path = os.path.join(*printable_dir, f"{category}_{transformation}.pdf")
+            pdf.output(output_path)
+            if verbose:
+                click.echo(f"File written to {output_path}")
+
+@click.option("--dryrun/--no-dryrun", default=False)
+@click.option("--verbose/--silent", default=True)
+@printable.command()
+def clean(dryrun, verbose):
+    """ clean generated printable files """
+    path = os.path.join(*printable_dir)
+    if os.path.isdir(path):
+        rm(path, dryrun=dryrun, verbose=verbose)
+
 
 # --- info commands
 

@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 
 
-def crop_to_circle(img, max_radius=256, bg_color=(0, 0, 0)):
+def crop_to_circle(img, max_radius=256, bg_color=(255, 255, 255)):
     """ crop the given image into a circle.
 
     :img: the image to be img
@@ -30,3 +30,30 @@ def crop_to_circle(img, max_radius=256, bg_color=(0, 0, 0)):
     # merge the images together
     result = Image.composite(img, bg, mask)
     return result
+
+def add_orientation_marker(img, marker_color=(0,0,0)):
+    """ add orientation marker to an image
+
+    :img: the input image
+    :marker_color: the color of the marker
+    :returns: the processed image
+
+    """
+    marker_length, marker_width = 20, 6
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+    draw.line((
+        (marker_width//2-1,               height-marker_width//2-1-marker_length), 
+        (marker_width//2-1,               height-marker_width//2-1), 
+        (marker_width//2-1+marker_length, height-marker_width//2-1)),
+        fill=marker_color,
+        width=marker_width,
+        joint="curve")
+    draw.line((
+        (width-marker_width//2-1,               height-marker_width//2-marker_length), 
+        (width-marker_width//2-1,               height-marker_width//2), 
+        (width-marker_width//2-1-marker_length, height-marker_width//2)),
+        fill=marker_color,
+        width=marker_width,
+        joint="curve")
+    return img
