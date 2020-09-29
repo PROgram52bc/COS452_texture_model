@@ -10,6 +10,8 @@ from src.utils.pdf import lay_images
 
 # --- constants
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 transformation_dir = ['src', 'transformations']
 analysis_dir = ['src', 'analysis']
 image_dir = ['images']

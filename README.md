@@ -48,6 +48,4 @@
 			-   `__init__.py`: contains a `rate(orig, comp): float` function to
 				calculate the difference rating according to `<metric>`.
 
--   `env.py`: contains environmental variables for python (e.g.  `ROOT_DIR`)
-
 -   `env.sh`: to be sourced before running the project
