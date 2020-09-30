@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import click
 import os
+import re
+import csv
 import importlib  # for dynamic import
 from PIL import Image
 from fpdf import FPDF
@@ -15,7 +17,9 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 transformation_dir = ['src', 'transformations']
 analysis_dir = ['src', 'analysis']
 image_dir = ['images']
+analysis_data_dir = ['data', 'metrics']
 printable_dir = ['printables']
+image_extensions = ['jpg', 'jpeg', 'png']
 
 # --- exceptions
 
@@ -44,6 +48,15 @@ def validate_transformations(ctx, param, value):
     return value
 
 
+def validate_metrics(ctx, param, value):
+    """ makes sure that the given image transformations are valid """
+    invalid_metrics = set(value) - set(get_metric_names())
+    if invalid_metrics:
+        raise ValueError(
+            f"Invalid image analysis names: {invalid_metrics}")
+    return value
+
+
 def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
     """returns a list of strings of each file/directories in _directory_
     The strings will be relative to the current directory
@@ -61,6 +74,10 @@ def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
     return list(items)
 
 
+def directory_filter(d):
+    return os.path.isdir(d) and not os.path.basename(d).startswith('_')
+
+
 def get_image_category_names():
     """gets all existing image categories
     :returns: a list of category names
@@ -68,7 +85,7 @@ def get_image_category_names():
     return ls(
         os.path.join(
             *image_dir),
-        filtr=os.path.isdir,
+        filtr=directory_filter,
         mapper=os.path.basename)
 
 
@@ -79,18 +96,18 @@ def get_transformation_names():
     return ls(
         os.path.join(
             *transformation_dir),
-        filtr=os.path.isdir,
+        filtr=directory_filter,
         mapper=os.path.basename)
 
 
-def get_analysis_names():
+def get_metric_names():
     """gets all available analysis metrics
     :returns: a list of names of analysis method
     """
     return ls(
         os.path.join(
             *analysis_dir),
-        filtr=os.path.isdir,
+        filtr=directory_filter,
         mapper=os.path.basename)
 
 
@@ -102,6 +119,35 @@ def read_image(path):
 
     """
     return Image.open(path)
+
+
+def read_orig(category):
+    """read the original image for a certain category
+
+    :category: the category to be read
+    :returns: the Image object
+
+    """
+    orig_path = get_existing_path(os.path.join(*image_dir, category, 'orig'))
+    if not orig_path:
+        raise ModuleError(f"no orig image found in category {category}")
+    orig = read_image(orig_path)
+    return orig
+
+
+def read_output(category):
+    """read the output reference image for a certain category
+
+    :category: the category to be read
+    :returns: the Image object
+
+    """
+    output_path = get_existing_path(
+        os.path.join(*image_dir, category, 'output'))
+    if not output_path:
+        raise ModuleError(f"no output image found in category {category}")
+    output = read_image(output_path)
+    return output
 
 
 def write_image(image, path, post_processors=[], override=True, verbose=True):
@@ -130,7 +176,7 @@ def write_image(image, path, post_processors=[], override=True, verbose=True):
         click.echo(f"successfully write to {path}")
 
 
-def get_existing_path(path, extensions=['jpg', 'jpeg', 'png']):
+def get_existing_path(path, extensions=image_extensions):
     """
 
     :path: the path to a file
@@ -144,6 +190,39 @@ def get_existing_path(path, extensions=['jpg', 'jpeg', 'png']):
         if os.path.isfile(option):
             return option
     return None
+
+
+def read_level_image_paths(category, transformation):
+    """read the transformed image for a certain category
+
+    :category: the category to be read
+    :transformation: the specific transformation
+    :returns: an array of image paths that exist
+
+    """
+    base_path = os.path.join(*image_dir, category, transformation)
+    level_paths = [
+        get_existing_path(
+            os.path.join(
+                base_path,
+                f"level_{level:02}")) for level in range(
+            0,
+            11)]
+    return list(filter(None, level_paths))
+
+
+def read_level_images(category, transformation):
+    """read the transformed image for a certain category
+
+    :category: the category to be read
+    :transformation: the specific transformation
+    :returns: an array of image objects
+
+    """
+    return [
+        read_image(path) for path in read_level_image_paths(
+            category,
+            transformation)]
 
 
 def rm(path, dryrun=False, verbose=True):
@@ -184,20 +263,6 @@ def rm(path, dryrun=False, verbose=True):
 
 
 # --- transform utilities
-
-
-def read_orig(category):
-    """read the original image for a certain category
-
-    :category: the category to be read
-    :returns: the Image object
-
-    """
-    orig_path = get_existing_path(os.path.join(*image_dir, category, 'orig'))
-    if not orig_path:
-        raise ModuleError(f"no orig image found in category {category}")
-    orig = read_image(orig_path)
-    return orig
 
 
 def transform_image(image, transformation, level):
@@ -254,6 +319,24 @@ def transform_image_by_category(
             override=override,
             verbose=verbose)
 
+# --- analyze utilities
+
+
+def get_level_numeric(filename):
+    """get the numeric level from filename
+
+    :filename: the file name of the level image. E.g. '.../level_00.jpg'
+    :returns: an integer representing the transformed level
+
+    """
+    match = re.search(
+        rf"level_(\d+)\.(?:{'|'.join(image_extensions)})$",
+        filename)
+    if not match:
+        raise ValueError(f"No numeric level found in filename {filename}")
+    return int(match.group(1))
+
+
 # --- info utilities
 
 
@@ -288,6 +371,7 @@ def transform():
 def analyze():
     pass
 
+
 @cli.group()
 def printable():
     pass
@@ -311,7 +395,8 @@ def printable():
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
 @click.option("--circle/--no-circle", "circle", default=True)
-@click.option("--orientation-mark/--no-orientation-mark", "orientation", default=True)
+@click.option("--orientation-mark/--no-orientation-mark",
+              "orientation", default=True)
 def all(categories, transformations, verbose, override, circle, orientation):
     """ transform all existing images with all available transformations
     if category is given, transform only the specified categories
@@ -380,20 +465,62 @@ def clean(categories, transformations, dryrun, verbose):
 
 # --- analyze commands
 
-# --- printable utilities
 
-def read_level_image_paths(category, transformation):
-    """read the transformed image for a certain category
-
-    :category: the category to be read
-    :transformation: the specific transformation
-    :returns: an array of image paths that exist
-
-    """
-    base_path = os.path.join(*image_dir, category, transformation)
-    level_paths = [ get_existing_path(os.path.join(base_path, f"level_{level:02}")) for level in range(0,11) ]
-    # level_images = [ read_image(path) for path in level_paths if path ]
-    return list(filter(None, level_paths))
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
+@click.option("-m",
+              "--metrics",
+              "metrics",
+              default=get_metric_names(),
+              multiple=True,
+              callback=validate_metrics)
+@click.option("--override/--no-override", default=True)
+@click.option("--verbose/--silent", default=True)
+@analyze.command()
+def all(categories, transformations, metrics, override, verbose):
+    # TODO: overwrite option
+    # TODO: verbose option
+    """analyze the generated images by comparing them with output.jpg """
+    os.makedirs(os.path.join(*analysis_data_dir), exist_ok=True)
+    for metric in metrics:
+        # import the metric module
+        mod = importlib.import_module(
+            '.'.join([*analysis_dir, metric]))
+        Analyzer = getattr(mod, 'Analyzer', None)
+        if not Analyzer:
+            raise ModuleError(
+                f"no analyzer class implemented in metric {metric}")
+        analyzer = Analyzer()
+        with open(os.path.join(*analysis_data_dir, f"{metric}.csv"), 'w') as data_file:
+            writer = csv.writer(data_file)
+            writer.writerow(['dataset', *range(11)])  # header row
+            for category in categories:
+                try:
+                    orig = read_output(category)
+                except ModuleError as e:
+                    print(e)
+                    print(f"Skipping category {category}...")
+                    continue
+                for transformation in transformations:
+                    images = read_level_images(category, transformation)
+                    if not images:
+                        print(
+                            f"no level images in {category}_{transformation}, skipping...")
+                        continue
+                    images = analyzer.sort(images, orig)  # sorted image
+                    order = [get_level_numeric(image.filename)
+                             for image in images]
+                    writer.writerow([f"{category}_{transformation}", *order])
 
 
 # --- printable commands
@@ -421,26 +548,40 @@ def all(categories, transformations, verbose):
             image_paths = read_level_image_paths(category, transformation)
             if len(image_paths) == 0:
                 if verbose:
-                    click.echo(f"Skip {category}, {transformation}, no level images found")
+                    click.echo(
+                        f"Skip {category}, {transformation}, no level images found")
                 continue
             if verbose:
-                click.echo(f"Generating printable for {category}, {transformation}...")
+                click.echo(
+                    f"Generating printable for {category}, {transformation}...")
             # generating pdf
             pdf = FPDF(orientation="L", unit="pt", format="letter")
             pdf.set_auto_page_break(False)
-            pdf.set_margins(10,10,10)
+            pdf.set_margins(10, 10, 10)
             pdf.set_font('Arial', 'B', 20)
             pdf.add_page()
-            pdf.cell(pdf.w, 30, f"Category: {category}; Transformation: {transformation}", border=0, ln=1, align="C")
+            pdf.cell(
+                pdf.w,
+                30,
+                f"Category: {category}; Transformation: {transformation}",
+                border=0,
+                ln=1,
+                align="C")
             pdf.set_font('Arial', '', 10)
-            pdf.cell(pdf.w, 30, 
-                    f"Images to be sorted first from left to right, then from top to bottom. From level_0 to level_10", 
-                    border=0, ln=1, align="C")
+            pdf.cell(
+                pdf.w,
+                30,
+                f"Images to be sorted first from left to right, then from top to bottom. From level_0 to level_10",
+                border=0,
+                ln=1,
+                align="C")
             lay_images(pdf, image_paths, width=240, space=10)
-            output_path = os.path.join(*printable_dir, f"{category}_{transformation}.pdf")
+            output_path = os.path.join(
+                *printable_dir, f"{category}_{transformation}.pdf")
             pdf.output(output_path)
             if verbose:
                 click.echo(f"File written to {output_path}")
+
 
 @click.option("--dryrun/--no-dryrun", default=False)
 @click.option("--verbose/--silent", default=True)
@@ -462,7 +603,7 @@ def all():
     click.echo("Transformations:")
     plist(get_transformation_names(), indent="\t")
     click.echo("Analyses:")
-    plist(get_analysis_names(), indent="\t")
+    plist(get_metric_names(), indent="\t")
 
 
 if __name__ == '__main__':
