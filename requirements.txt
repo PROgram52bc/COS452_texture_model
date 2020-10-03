@@ -1,5 +1,6 @@
 Pillow
 ipython
 numpy
+scipy
 click
 fpdf
