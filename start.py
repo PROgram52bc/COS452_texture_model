@@ -31,6 +31,18 @@ class ModuleError(Exception):
 # --- utilities
 
 
+def pif(verbose, msg):
+    """print if verbose
+
+    :verbose: boolean indicating whether or not to print
+    :msg: message to be printed
+    :returns: None
+
+    """
+    if verbose:
+        click.echo(msg)
+
+
 def validate_image_categories(ctx, param, value):
     """ makes sure that the given image categories are valid """
     invalid_categories = set(value) - set(get_image_category_names())
@@ -163,17 +175,14 @@ def write_image(image, path, post_processors=[], override=True, verbose=True):
     """
     if os.path.isfile(path):
         if not override:
-            if verbose:
-                click.echo(f"image at {path} exists, not overriding")
+            pif(verbose, f"image at {path} exists, not overriding")
             return
         else:
-            if verbose:
-                click.echo(f"overriding image at {path}")
+            pif(verbose, f"overriding image at {path}")
     for p in post_processors:
         image = p(image)
     image.save(path)
-    if verbose:
-        click.echo(f"successfully write to {path}")
+    pif(verbose, f"successfully write to {path}")
 
 
 def get_existing_path(path, extensions=image_extensions):
@@ -236,8 +245,7 @@ def rm(path, dryrun=False, verbose=True):
     """
     # helper function
     def _rm(item, is_file=False):
-        if verbose:
-            click.echo(item)
+        pif(verbose, item)
         if not dryrun:
             if is_file:
                 os.remove(item)
@@ -336,6 +344,49 @@ def get_level_numeric(filename):
         raise ValueError(f"No numeric level found in filename {filename}")
     return int(match.group(1))
 
+# --- printable utilities
+
+
+def generate_pdf(category, transformation, verbose):
+    """generate pdf file with transformed images
+
+    :category: the category of image
+    :transformation: the transformation to be used
+    :returns: None
+
+    """
+    # read available images
+    image_paths = read_level_image_paths(category, transformation)
+    if len(image_paths) == 0:
+        pif(verbose, f"Skip {category}, {transformation}, no level images found")
+        return None
+    # generate pdf
+    pdf = FPDF(orientation="L", unit="pt", format="letter")
+    pdf.set_auto_page_break(False)
+    pdf.set_margins(20, 20, 20)
+    pdf.set_font('Arial', 'B', 20)
+    pdf.add_page()
+    pdf.cell(
+        pdf.w,
+        30,
+        f"Category: {category}; Transformation: {transformation}",
+        border=0,
+        ln=1,
+        align="C")
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(
+        pdf.w,
+        30,
+        f"Images to be sorted first from left to right, then from top to bottom. From level_0 to level_10",
+        border=0,
+        ln=1,
+        align="C")
+    lay_images(pdf, image_paths, width=240, space=10)
+    output_path = os.path.join(
+        *printable_dir, f"{category}_{transformation}.pdf")
+    pdf.output(output_path)
+    pif(verbose, f"File written to {output_path}")
+
 
 # --- info utilities
 
@@ -357,29 +408,28 @@ def cli():
     pass
 
 
-@cli.group()
+@cli.group(help="Show information related to various modules")
 def info():
     pass
 
 
-@cli.group()
+@cli.group(help="Transform images using available transformations")
 def transform():
     pass
 
 
-@cli.group()
+@cli.group(help="Analyze transformed images with available metrics")
 def analyze():
     pass
 
 
-@cli.group()
+@cli.group(help="Generate printable documents")
 def printable():
     pass
 
 # --- transform commands
 
 
-@transform.command()
 @click.option("-c",
               "--category",
               "categories",
@@ -397,8 +447,10 @@ def printable():
 @click.option("--circle/--no-circle", "circle", default=True)
 @click.option("--orientation-mark/--no-orientation-mark",
               "orientation", default=True)
-def all(categories, transformations, verbose, override, circle, orientation):
-    """ transform all existing images with all available transformations
+@transform.command('all')
+def transform_all(categories, transformations, verbose, override, circle, orientation):
+    """ Transform all existing images with all available transformations.
+
     if category is given, transform only the specified categories
     if transformation is given, transform with only the specified transformations
     by default, images will be cropped into a circle, can override this behavior with --no-circle
@@ -411,8 +463,7 @@ def all(categories, transformations, verbose, override, circle, orientation):
             post_processors.append(add_orientation_marker)
 
     for category in categories:
-        if verbose:
-            click.echo(f"Processing category {category}...")
+        pif(verbose, f"Processing category {category}...")
         # generate the unmodified reference image
         orig = read_orig(category)
         out_path = os.path.join(*image_dir, category, "output.jpg")
@@ -424,8 +475,7 @@ def all(categories, transformations, verbose, override, circle, orientation):
             verbose=verbose)
 
         for transformation in transformations:
-            if verbose:
-                click.echo(f"Transforming with {transformation}...")
+            pif(verbose, f"Transforming with {transformation}...")
             transform_image_by_category(
                 category,
                 transformation,
@@ -487,10 +537,8 @@ def clean(categories, transformations, dryrun, verbose):
 @click.option("--override/--no-override", default=True)
 @click.option("--verbose/--silent", default=True)
 @analyze.command()
-def all(categories, transformations, metrics, override, verbose):
-    # TODO: overwrite option
-    # TODO: verbose option
-    """analyze the generated images by comparing them with output.jpg """
+def sort(categories, transformations, metrics, override, verbose):
+    """sort the generated images by comparing them with output.jpg """
     os.makedirs(os.path.join(*analysis_data_dir), exist_ok=True)
     for metric in metrics:
         # import the metric module
@@ -501,6 +549,12 @@ def all(categories, transformations, metrics, override, verbose):
             raise ModuleError(
                 f"no analyzer class implemented in metric {metric}")
         analyzer = Analyzer()
+        pif(verbose, f"sorting images with {metric}...")
+        # check if file exists
+        path = os.path.join(*analysis_data_dir, f"{metric}.csv")
+        if os.path.isfile(path) and not override:
+            pif(verbose, f"file at {path} exists, skipping...")
+            continue
         with open(os.path.join(*analysis_data_dir, f"{metric}.csv"), 'w') as data_file:
             writer = csv.writer(data_file)
             writer.writerow(['dataset', *range(11)])  # header row
@@ -508,19 +562,19 @@ def all(categories, transformations, metrics, override, verbose):
                 try:
                     orig = read_output(category)
                 except ModuleError as e:
-                    print(e)
-                    print(f"Skipping category {category}...")
+                    pif(verbose, e)
+                    pif(verbose, f"Skipping category {category}...")
                     continue
                 for transformation in transformations:
                     images = read_level_images(category, transformation)
                     if not images:
-                        print(
-                            f"no level images in {category}_{transformation}, skipping...")
+                        pif(verbose, f"no level images in {category}_{transformation}, skipping...")
                         continue
                     images = analyzer.sort(images, orig)  # sorted image
                     order = [get_level_numeric(image.filename)
                              for image in images]
                     writer.writerow([f"{category}_{transformation}", *order])
+        pif(verbose, f"data written to {path}")
 
 
 # --- printable commands
@@ -538,49 +592,15 @@ def all(categories, transformations, metrics, override, verbose):
               multiple=True,
               callback=validate_transformations)
 @click.option("--verbose/--silent", default=True)
-@printable.command()
-def all(categories, transformations, verbose):
+@printable.command('all')
+def printable_all(categories, transformations, verbose):
     """ generate printable files with the transformed images """
     os.makedirs(os.path.join(*printable_dir), exist_ok=True)
     for category in categories:
         for transformation in transformations:
             # read available level images
-            image_paths = read_level_image_paths(category, transformation)
-            if len(image_paths) == 0:
-                if verbose:
-                    click.echo(
-                        f"Skip {category}, {transformation}, no level images found")
-                continue
-            if verbose:
-                click.echo(
-                    f"Generating printable for {category}, {transformation}...")
-            # generating pdf
-            pdf = FPDF(orientation="L", unit="pt", format="letter")
-            pdf.set_auto_page_break(False)
-            pdf.set_margins(10, 10, 10)
-            pdf.set_font('Arial', 'B', 20)
-            pdf.add_page()
-            pdf.cell(
-                pdf.w,
-                30,
-                f"Category: {category}; Transformation: {transformation}",
-                border=0,
-                ln=1,
-                align="C")
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(
-                pdf.w,
-                30,
-                f"Images to be sorted first from left to right, then from top to bottom. From level_0 to level_10",
-                border=0,
-                ln=1,
-                align="C")
-            lay_images(pdf, image_paths, width=240, space=10)
-            output_path = os.path.join(
-                *printable_dir, f"{category}_{transformation}.pdf")
-            pdf.output(output_path)
-            if verbose:
-                click.echo(f"File written to {output_path}")
+            pif(verbose, f"Generating printable for {category}, {transformation}...")
+            generate_pdf(category, transformation, verbose)
 
 
 @click.option("--dryrun/--no-dryrun", default=False)
@@ -596,8 +616,8 @@ def clean(dryrun, verbose):
 # --- info commands
 
 
-@info.command()
-def all():
+@info.command('all')
+def info_all():
     click.echo("Image categories:")
     plist(get_image_category_names(), indent="\t")
     click.echo("Transformations:")
