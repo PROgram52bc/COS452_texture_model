@@ -3,7 +3,9 @@ import click
 import os
 import re
 import csv
+import numpy
 import importlib  # for dynamic import
+from scipy.stats import spearmanr
 from PIL import Image
 from fpdf import FPDF
 
@@ -17,9 +19,15 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 transformation_dir = ['src', 'transformations']
 analysis_dir = ['src', 'analysis']
 image_dir = ['images']
-analysis_data_dir = ['data', 'metrics']
+sorted_data_dir = ['data', 'sort']
+metric_sorted_data_dir = [*sorted_data_dir, 'metrics']
+human_sorted_data_dir = [*sorted_data_dir, 'humans']
+ranked_data_dir = ['data', 'rank']
 printable_dir = ['printables']
 image_extensions = ['jpg', 'jpeg', 'png']
+
+csv_subfield_delim = '#'  # delimiter for subfields in csv
+agent_name_delim = '-'  # delimiter for separating agent type from agent name
 
 # --- exceptions
 
@@ -76,9 +84,13 @@ def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
     :directory: the directory to list, defaults to the current directory
     :filtr: the filter function to apply on each returned element
     :mapper: the mapper function to transform each returned element, applied after filter function
-    :returns: a list of strings
+    :returns: a list of strings, empty if the directory does not exist
     """
+    # check for non-existing directory
+    if directory and not os.path.isdir(directory):
+        return []
     items = os.listdir(directory)
+    # prepend the directory name if needed
     if directory:
         items = map(lambda item: os.path.join(directory, item), items)
     items = filter(filtr, items)
@@ -87,7 +99,13 @@ def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
 
 
 def directory_filter(d):
+    """ returns True if 'd' is a valid directory, False otherwise """
     return os.path.isdir(d) and not os.path.basename(d).startswith('_')
+
+
+def csv_filter(f):
+    """ returns True if 'f' is a valid csv file, False otherwise """
+    return os.path.isfile(f) and os.path.splitext(f)[1] == '.csv'
 
 
 def get_image_category_names():
@@ -121,6 +139,44 @@ def get_metric_names():
             *analysis_dir),
         filtr=directory_filter,
         mapper=os.path.basename)
+
+
+def read_csv(path):
+    """read csv file as a list of rows
+
+    :path: path to the csv file
+    :returns: the list of rows in the csv file
+
+    """
+    with open(path, newline='') as f:
+        return list(csv.reader(f))
+
+
+def agent2file(agent):
+    """convert an agent name to file path
+
+    :agent: the agent name, in the form of (humans|metrics)#name
+    :returns: the file name corresponding to the agent
+
+    """
+    return os.path.join(
+        *sorted_data_dir,
+        *agent.split(agent_name_delim),
+        os.extsep,
+        'csv')
+
+
+def file2agent(filename):
+    """convert a csv filename to an agent name
+
+    :filename: the csv filename
+    :returns: the agent name in the form of (humans|metrics)#name
+
+    """
+    head, tail = os.path.split(filename)
+    agent_type = os.path.split(head)[1]
+    agent_name = os.path.splitext(tail)[0]
+    return agent_name_delim.join([agent_type, agent_name])
 
 
 def read_image(path):
@@ -344,6 +400,69 @@ def get_level_numeric(filename):
         raise ValueError(f"No numeric level found in filename {filename}")
     return int(match.group(1))
 
+
+def rank_standard(f, categories, transformations, override, verbose):
+    """ calculate spearman's rank for each category + transformation with each metrics.
+    comparisons are made against the standard order (0-10),
+
+    :f: the file to be written into
+    :categories: the categories to be considered
+    :transformations: the transformations to be considered
+    :override: override existing files
+    :verbose: print output regarding writing status
+    :returns: None
+
+    """
+    rows = []
+    fieldnames = ['agent']
+    # read the sorted data according to each agent (metrics or human)
+    # can add a filter later to read only certain agents
+    # need a way to name metrics and human agents uniformly
+    for csv_file in (ls(os.path.join(*metric_sorted_data_dir),
+                        filtr=csv_filter) + ls(os.path.join(*human_sorted_data_dir),
+                                               filtr=csv_filter)):
+        # set up agent name
+        row_r = {}  # row for coefficient
+        row_p = {}  # row for p_value
+        agent = file2agent(csv_file)
+        row_r['agent'] = csv_subfield_delim.join([agent, 'r'])
+        row_p['agent'] = csv_subfield_delim.join([agent, 'p'])
+        pif(verbose, f"calculating ranks for {agent}...")
+        # read file
+        with open(csv_file, newline='') as input_file:
+            reader = csv.reader(input_file)
+            header, *sorted_data = list(reader)
+        for category_transformation, *order in sorted_data:
+            # discard the label at the first column
+            reference_order = header[1:]
+            category, transformation = category_transformation.split(
+                csv_subfield_delim)
+            # filter category and transformation
+            if category not in categories:
+                pif(verbose,
+                    f"Category {category} not specified, skipping {category}, {transformation}...")
+                continue
+            if transformation not in transformations:
+                pif(verbose,
+                    f"Transformation {transformation} not specified, skipping {category}, {transformation}...")
+                continue
+            if category_transformation not in fieldnames:
+                # add field name if encountering a new one
+                fieldnames.append(category_transformation)
+            r, p = spearmanr(reference_order, order)  # calculate spm-rank
+            # cell = csv_subfield_delim.join(map(lambda v: str(numpy.round(v,
+            # decimals=3)), result)) # combine coefficient and p_value into a
+            # single cell
+            row_r[category_transformation] = str(numpy.round(r, decimals=2))
+            row_p[category_transformation] = str(numpy.round(p, decimals=3))
+
+        rows.append(row_r)
+        rows.append(row_p)
+    writer = csv.DictWriter(f, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+
 # --- printable utilities
 
 
@@ -358,7 +477,8 @@ def generate_pdf(category, transformation, verbose):
     # read available images
     image_paths = read_level_image_paths(category, transformation)
     if len(image_paths) == 0:
-        pif(verbose, f"Skip {category}, {transformation}, no level images found")
+        pif(verbose,
+            f"Skip {category}, {transformation}, no level images found")
         return None
     # generate pdf
     pdf = FPDF(orientation="L", unit="pt", format="letter")
@@ -427,6 +547,12 @@ def analyze():
 def printable():
     pass
 
+
+@cli.group(help="Clean up generated data")
+def clean():
+    pass
+
+
 # --- transform commands
 
 
@@ -448,7 +574,13 @@ def printable():
 @click.option("--orientation-mark/--no-orientation-mark",
               "orientation", default=True)
 @transform.command('all')
-def transform_all(categories, transformations, verbose, override, circle, orientation):
+def transform_all(
+        categories,
+        transformations,
+        verbose,
+        override,
+        circle,
+        orientation):
     """ Transform all existing images with all available transformations.
 
     if category is given, transform only the specified categories
@@ -484,35 +616,6 @@ def transform_all(categories, transformations, verbose, override, circle, orient
                 verbose=verbose)
 
 
-@transform.command()
-@click.option("-c",
-              "--category",
-              "categories",
-              default=get_image_category_names(),
-              multiple=True,
-              callback=validate_image_categories)
-@click.option("-t",
-              "--transformation",
-              "transformations",
-              default=get_transformation_names(),
-              multiple=True,
-              callback=validate_transformations)
-@click.option("--dryrun/--no-dryrun", default=False)
-@click.option("--verbose/--silent", default=True)
-def clean(categories, transformations, dryrun, verbose):
-    """ clean transformed images """
-    for category in categories:
-        # remove the reference output image
-        output_path = os.path.join(*image_dir, category, "output.jpg")
-        if os.path.isfile(output_path):
-            rm(output_path, dryrun=dryrun, verbose=verbose)
-        # remove images under each transformation
-        for transformation in transformations:
-            transformation_path = os.path.join(
-                *image_dir, category, transformation)
-            if os.path.isdir(transformation_path):
-                rm(transformation_path, dryrun=dryrun, verbose=verbose)
-
 # --- analyze commands
 
 
@@ -539,7 +642,7 @@ def clean(categories, transformations, dryrun, verbose):
 @analyze.command()
 def sort(categories, transformations, metrics, override, verbose):
     """sort the generated images by comparing them with output.jpg """
-    os.makedirs(os.path.join(*analysis_data_dir), exist_ok=True)
+    os.makedirs(os.path.join(*metric_sorted_data_dir), exist_ok=True)
     for metric in metrics:
         # import the metric module
         mod = importlib.import_module(
@@ -551,13 +654,14 @@ def sort(categories, transformations, metrics, override, verbose):
         analyzer = Analyzer()
         pif(verbose, f"sorting images with {metric}...")
         # check if file exists
-        path = os.path.join(*analysis_data_dir, f"{metric}.csv")
+        path = os.path.join(*metric_sorted_data_dir, f"{metric}.csv")
         if os.path.isfile(path) and not override:
             pif(verbose, f"file at {path} exists, skipping...")
             continue
-        with open(os.path.join(*analysis_data_dir, f"{metric}.csv"), 'w') as data_file:
+        with open(os.path.join(*metric_sorted_data_dir, f"{metric}.csv"), 'w', newline='') as data_file:
             writer = csv.writer(data_file)
-            writer.writerow(['dataset', *range(11)])  # header row
+            writer.writerow([csv_subfield_delim.join(
+                ['CATEGORY', 'TRANSFORMATION']), *range(11)])  # header row
             for category in categories:
                 try:
                     orig = read_output(category)
@@ -568,16 +672,54 @@ def sort(categories, transformations, metrics, override, verbose):
                 for transformation in transformations:
                     images = read_level_images(category, transformation)
                     if not images:
-                        pif(verbose, f"no level images in {category}_{transformation}, skipping...")
+                        pif(verbose,
+                            f"no level images in {category}_{transformation}, skipping...")
                         continue
                     images = analyzer.sort(images, orig)  # sorted image
                     order = [get_level_numeric(image.filename)
                              for image in images]
-                    writer.writerow([f"{category}_{transformation}", *order])
+                    writer.writerow([csv_subfield_delim.join(
+                        [category, transformation]), *order])
         pif(verbose, f"data written to {path}")
 
 
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
+@click.option("--mode",
+              type=click.Choice(['standard',
+                                 'human']),
+              default="standard",
+              help="'standard' mode will rank against the normal ordering (0-10), while 'human' mode will rank against human ratings")
+@click.option("--override/--no-override", default=True)
+@click.option("--verbose/--silent", default=True)
+@analyze.command()
+def rank(categories, transformations, mode, override, verbose):
+    """ Calculate spearmanrank and p-value for each metric and transformation"""
+    path = os.path.join(*ranked_data_dir)
+    os.makedirs(path, exist_ok=True)
+    file_path = os.path.join(path, f"{mode}.csv")
+    if os.path.isfile(file_path) and not override:
+        pif(verbose, f"file at {file_path} exists, skipping...")
+        return
+    with open(file_path, "w", newline='') as f:
+        if mode == 'standard':
+            rank_standard(f, categories, transformations, override, verbose)
+        else:
+            pass
+    pif(verbose, f"data written into {file_path}")
+
 # --- printable commands
+
 
 @click.option("-c",
               "--category",
@@ -599,18 +741,9 @@ def printable_all(categories, transformations, verbose):
     for category in categories:
         for transformation in transformations:
             # read available level images
-            pif(verbose, f"Generating printable for {category}, {transformation}...")
+            pif(verbose,
+                f"Generating printable for {category}, {transformation}...")
             generate_pdf(category, transformation, verbose)
-
-
-@click.option("--dryrun/--no-dryrun", default=False)
-@click.option("--verbose/--silent", default=True)
-@printable.command()
-def clean(dryrun, verbose):
-    """ clean generated printable files """
-    path = os.path.join(*printable_dir)
-    if os.path.isdir(path):
-        rm(path, dryrun=dryrun, verbose=verbose)
 
 
 # --- info commands
@@ -624,6 +757,58 @@ def info_all():
     plist(get_transformation_names(), indent="\t")
     click.echo("Analyses:")
     plist(get_metric_names(), indent="\t")
+
+
+# --- clean commands
+
+@click.option("-c",
+              "--category",
+              "categories",
+              default=get_image_category_names(),
+              multiple=True,
+              callback=validate_image_categories)
+@click.option("-t",
+              "--transformation",
+              "transformations",
+              default=get_transformation_names(),
+              multiple=True,
+              callback=validate_transformations)
+@click.option("--dryrun/--no-dryrun", default=False)
+@click.option("--verbose/--silent", default=True)
+@clean.command('transform')
+def transform_clean(categories, transformations, dryrun, verbose):
+    """ clean transformed images """
+    for category in categories:
+        # remove the reference output image
+        output_path = os.path.join(*image_dir, category, "output.jpg")
+        if os.path.isfile(output_path):
+            rm(output_path, dryrun=dryrun, verbose=verbose)
+        # remove images under each transformation
+        for transformation in transformations:
+            transformation_path = os.path.join(
+                *image_dir, category, transformation)
+            if os.path.isdir(transformation_path):
+                rm(transformation_path, dryrun=dryrun, verbose=verbose)
+
+
+@click.option("--dryrun/--no-dryrun", default=False)
+@click.option("--verbose/--silent", default=True)
+@clean.command('sort')
+def sort_clean(dryrun, verbose):
+    """ clean sort data generated with the metrics. """
+    path = os.path.join(*metric_sorted_data_dir)
+    if os.path.isdir(path):
+        rm(path, dryrun=dryrun, verbose=verbose)
+
+
+@click.option("--dryrun/--no-dryrun", default=False)
+@click.option("--verbose/--silent", default=True)
+@clean.command('printable')
+def printable_clean(dryrun, verbose):
+    """ clean generated printable files """
+    path = os.path.join(*printable_dir)
+    if os.path.isdir(path):
+        rm(path, dryrun=dryrun, verbose=verbose)
 
 
 if __name__ == '__main__':
