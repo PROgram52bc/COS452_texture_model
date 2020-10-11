@@ -9,8 +9,9 @@ from scipy.stats import spearmanr
 from PIL import Image
 from fpdf import FPDF
 
-from src.utils.helpers import crop_to_circle, add_orientation_marker
-from src.utils.pdf import lay_images
+from src.etc.postprocessors import crop_to_circle, add_orientation_marker
+from src.etc.helpers import ModuleError
+from src.etc.pdf import lay_images
 
 # --- constants
 
@@ -28,13 +29,6 @@ image_extensions = ['jpg', 'jpeg', 'png']
 
 csv_subfield_delim = '#'  # delimiter for subfields in csv
 agent_name_delim = '-'  # delimiter for separating agent type from agent name
-
-# --- exceptions
-
-
-class ModuleError(Exception):
-    """ when a module is not implemented according to the specification """
-    pass
 
 # --- utilities
 
@@ -114,7 +108,7 @@ def get_image_category_names():
     """
     return ls(
         os.path.join(
-            *image_dir),
+            ROOT_DIR, *image_dir),
         filtr=directory_filter,
         mapper=os.path.basename)
 
@@ -125,7 +119,7 @@ def get_transformation_names():
     """
     return ls(
         os.path.join(
-            *transformation_dir),
+            ROOT_DIR, *transformation_dir),
         filtr=directory_filter,
         mapper=os.path.basename)
 
@@ -136,7 +130,7 @@ def get_metric_names():
     """
     return ls(
         os.path.join(
-            *analysis_dir),
+            ROOT_DIR, *analysis_dir),
         filtr=directory_filter,
         mapper=os.path.basename)
 
@@ -160,7 +154,7 @@ def agent2file(agent):
 
     """
     return os.path.join(
-        *sorted_data_dir,
+        ROOT_DIR, *sorted_data_dir,
         *agent.split(agent_name_delim),
         os.extsep,
         'csv')
@@ -196,7 +190,7 @@ def read_orig(category):
     :returns: the Image object
 
     """
-    orig_path = get_existing_path(os.path.join(*image_dir, category, 'orig'))
+    orig_path = get_existing_path(os.path.join(ROOT_DIR, *image_dir, category, 'orig'))
     if not orig_path:
         raise ModuleError(f"no orig image found in category {category}")
     orig = read_image(orig_path)
@@ -211,7 +205,7 @@ def read_output(category):
 
     """
     output_path = get_existing_path(
-        os.path.join(*image_dir, category, 'output'))
+        os.path.join(ROOT_DIR, *image_dir, category, 'output'))
     if not output_path:
         raise ModuleError(f"no output image found in category {category}")
     output = read_image(output_path)
@@ -265,7 +259,7 @@ def read_level_image_paths(category, transformation):
     :returns: an array of image paths that exist
 
     """
-    base_path = os.path.join(*image_dir, category, transformation)
+    base_path = os.path.join(ROOT_DIR, *image_dir, category, transformation)
     level_paths = [
         get_existing_path(
             os.path.join(
@@ -369,7 +363,7 @@ def transform_image_by_category(
     orig = read_orig(category)
     for level in levels:
         out = transform_image(orig, transformation, level)
-        out_path = os.path.join(*image_dir, category, transformation)
+        out_path = os.path.join(ROOT_DIR, *image_dir, category, transformation)
         os.makedirs(out_path, exist_ok=True)
         out_path = os.path.join(
             out_path,
@@ -418,8 +412,8 @@ def rank_standard(f, categories, transformations, override, verbose):
     # read the sorted data according to each agent (metrics or human)
     # can add a filter later to read only certain agents
     # need a way to name metrics and human agents uniformly
-    for csv_file in (ls(os.path.join(*metric_sorted_data_dir),
-                        filtr=csv_filter) + ls(os.path.join(*human_sorted_data_dir),
+    for csv_file in (ls(os.path.join(ROOT_DIR, *metric_sorted_data_dir),
+                        filtr=csv_filter) + ls(os.path.join(ROOT_DIR, *human_sorted_data_dir),
                                                filtr=csv_filter)):
         # set up agent name
         row_r = {}  # row for coefficient
@@ -503,7 +497,7 @@ def generate_pdf(category, transformation, verbose):
         align="C")
     lay_images(pdf, image_paths, width=240, space=10)
     output_path = os.path.join(
-        *printable_dir, f"{category}_{transformation}.pdf")
+        ROOT_DIR, *printable_dir, f"{category}_{transformation}.pdf")
     pdf.output(output_path)
     pif(verbose, f"File written to {output_path}")
 
@@ -598,7 +592,7 @@ def transform_all(
         pif(verbose, f"Processing category {category}...")
         # generate the unmodified reference image
         orig = read_orig(category)
-        out_path = os.path.join(*image_dir, category, "output.jpg")
+        out_path = os.path.join(ROOT_DIR, *image_dir, category, "output.jpg")
         write_image(
             orig,
             out_path,
@@ -642,7 +636,7 @@ def transform_all(
 @analyze.command()
 def sort(categories, transformations, metrics, override, verbose):
     """sort the generated images by comparing them with output.jpg """
-    os.makedirs(os.path.join(*metric_sorted_data_dir), exist_ok=True)
+    os.makedirs(os.path.join(ROOT_DIR, *metric_sorted_data_dir), exist_ok=True)
     for metric in metrics:
         # import the metric module
         mod = importlib.import_module(
@@ -654,11 +648,11 @@ def sort(categories, transformations, metrics, override, verbose):
         analyzer = Analyzer()
         pif(verbose, f"sorting images with {metric}...")
         # check if file exists
-        path = os.path.join(*metric_sorted_data_dir, f"{metric}.csv")
+        path = os.path.join(ROOT_DIR, *metric_sorted_data_dir, f"{metric}.csv")
         if os.path.isfile(path) and not override:
             pif(verbose, f"file at {path} exists, skipping...")
             continue
-        with open(os.path.join(*metric_sorted_data_dir, f"{metric}.csv"), 'w', newline='') as data_file:
+        with open(os.path.join(ROOT_DIR, *metric_sorted_data_dir, f"{metric}.csv"), 'w', newline='') as data_file:
             writer = csv.writer(data_file)
             writer.writerow([csv_subfield_delim.join(
                 ['CATEGORY', 'TRANSFORMATION']), *range(11)])  # header row
@@ -705,7 +699,7 @@ def sort(categories, transformations, metrics, override, verbose):
 @analyze.command()
 def rank(categories, transformations, mode, override, verbose):
     """ Calculate spearmanrank and p-value for each metric and transformation"""
-    path = os.path.join(*ranked_data_dir)
+    path = os.path.join(ROOT_DIR, *ranked_data_dir)
     os.makedirs(path, exist_ok=True)
     file_path = os.path.join(path, f"{mode}.csv")
     if os.path.isfile(file_path) and not override:
@@ -737,7 +731,7 @@ def rank(categories, transformations, mode, override, verbose):
 @printable.command('all')
 def printable_all(categories, transformations, verbose):
     """ generate printable files with the transformed images """
-    os.makedirs(os.path.join(*printable_dir), exist_ok=True)
+    os.makedirs(os.path.join(ROOT_DIR, *printable_dir), exist_ok=True)
     for category in categories:
         for transformation in transformations:
             # read available level images
@@ -780,13 +774,13 @@ def transform_clean(categories, transformations, dryrun, verbose):
     """ clean transformed images """
     for category in categories:
         # remove the reference output image
-        output_path = os.path.join(*image_dir, category, "output.jpg")
+        output_path = os.path.join(ROOT_DIR, *image_dir, category, "output.jpg")
         if os.path.isfile(output_path):
             rm(output_path, dryrun=dryrun, verbose=verbose)
         # remove images under each transformation
         for transformation in transformations:
             transformation_path = os.path.join(
-                *image_dir, category, transformation)
+                ROOT_DIR, *image_dir, category, transformation)
             if os.path.isdir(transformation_path):
                 rm(transformation_path, dryrun=dryrun, verbose=verbose)
 
@@ -796,7 +790,7 @@ def transform_clean(categories, transformations, dryrun, verbose):
 @clean.command('sort')
 def sort_clean(dryrun, verbose):
     """ clean sort data generated with the metrics. """
-    path = os.path.join(*metric_sorted_data_dir)
+    path = os.path.join(ROOT_DIR, *metric_sorted_data_dir)
     if os.path.isdir(path):
         rm(path, dryrun=dryrun, verbose=verbose)
 
@@ -806,7 +800,7 @@ def sort_clean(dryrun, verbose):
 @clean.command('printable')
 def printable_clean(dryrun, verbose):
     """ clean generated printable files """
-    path = os.path.join(*printable_dir)
+    path = os.path.join(ROOT_DIR, *printable_dir)
     if os.path.isdir(path):
         rm(path, dryrun=dryrun, verbose=verbose)
 
