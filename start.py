@@ -10,315 +10,11 @@ from PIL import Image
 from fpdf import FPDF
 
 from src.etc.postprocessors import crop_to_circle, add_orientation_marker
-from src.etc.helpers import ModuleError
+from src.etc.utilities import pif, plist, ls, rm, read_csv, read_image, write_image, directory_filter, csv_filter
+from src.etc.exceptions import ModuleError
 from src.etc.pdf import lay_images
-
-# --- constants
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-transformation_dir = ['src', 'transformations']
-analysis_dir = ['src', 'analysis']
-image_dir = ['images']
-sorted_data_dir = ['data', 'sort']
-metric_sorted_data_dir = [*sorted_data_dir, 'metrics']
-human_sorted_data_dir = [*sorted_data_dir, 'humans']
-ranked_data_dir = ['data', 'rank']
-printable_dir = ['printables']
-image_extensions = ['jpg', 'jpeg', 'png']
-
-csv_subfield_delim = '#'  # delimiter for subfields in csv
-agent_name_delim = '-'  # delimiter for separating agent type from agent name
-
-# --- utilities
-
-
-def pif(verbose, msg):
-    """print if verbose
-
-    :verbose: boolean indicating whether or not to print
-    :msg: message to be printed
-    :returns: None
-
-    """
-    if verbose:
-        click.echo(msg)
-
-
-def validate_image_categories(ctx, param, value):
-    """ makes sure that the given image categories are valid """
-    invalid_categories = set(value) - set(get_image_category_names())
-    if invalid_categories:
-        raise ValueError(f"Invalid image categories: {invalid_categories}")
-    return value
-
-
-def validate_transformations(ctx, param, value):
-    """ makes sure that the given image transformations are valid """
-    invalid_transformations = set(value) - set(get_transformation_names())
-    if invalid_transformations:
-        raise ValueError(
-            f"Invalid image transformations: {invalid_transformations}")
-    return value
-
-
-def validate_metrics(ctx, param, value):
-    """ makes sure that the given image transformations are valid """
-    invalid_metrics = set(value) - set(get_metric_names())
-    if invalid_metrics:
-        raise ValueError(
-            f"Invalid image analysis names: {invalid_metrics}")
-    return value
-
-
-def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
-    """returns a list of strings of each file/directories in _directory_
-    The strings will be relative to the current directory
-
-    :directory: the directory to list, defaults to the current directory
-    :filtr: the filter function to apply on each returned element
-    :mapper: the mapper function to transform each returned element, applied after filter function
-    :returns: a list of strings, empty if the directory does not exist
-    """
-    # check for non-existing directory
-    if directory and not os.path.isdir(directory):
-        return []
-    items = os.listdir(directory)
-    # prepend the directory name if needed
-    if directory:
-        items = map(lambda item: os.path.join(directory, item), items)
-    items = filter(filtr, items)
-    items = map(mapper, items)
-    return list(items)
-
-
-def directory_filter(d):
-    """ returns True if 'd' is a valid directory, False otherwise """
-    return os.path.isdir(d) and not os.path.basename(d).startswith('_')
-
-
-def csv_filter(f):
-    """ returns True if 'f' is a valid csv file, False otherwise """
-    return os.path.isfile(f) and os.path.splitext(f)[1] == '.csv'
-
-
-def get_image_category_names():
-    """gets all existing image categories
-    :returns: a list of category names
-    """
-    return ls(
-        os.path.join(
-            ROOT_DIR, *image_dir),
-        filtr=directory_filter,
-        mapper=os.path.basename)
-
-
-def get_transformation_names():
-    """gets all available transformations
-    :returns: a list of names of transformation
-    """
-    return ls(
-        os.path.join(
-            ROOT_DIR, *transformation_dir),
-        filtr=directory_filter,
-        mapper=os.path.basename)
-
-
-def get_metric_names():
-    """gets all available analysis metrics
-    :returns: a list of names of analysis method
-    """
-    return ls(
-        os.path.join(
-            ROOT_DIR, *analysis_dir),
-        filtr=directory_filter,
-        mapper=os.path.basename)
-
-
-def read_csv(path):
-    """read csv file as a list of rows
-
-    :path: path to the csv file
-    :returns: the list of rows in the csv file
-
-    """
-    with open(path, newline='') as f:
-        return list(csv.reader(f))
-
-
-def agent2file(agent):
-    """convert an agent name to file path
-
-    :agent: the agent name, in the form of (humans|metrics)#name
-    :returns: the file name corresponding to the agent
-
-    """
-    return os.path.join(
-        ROOT_DIR, *sorted_data_dir,
-        *agent.split(agent_name_delim),
-        os.extsep,
-        'csv')
-
-
-def file2agent(filename):
-    """convert a csv filename to an agent name
-
-    :filename: the csv filename
-    :returns: the agent name in the form of (humans|metrics)#name
-
-    """
-    head, tail = os.path.split(filename)
-    agent_type = os.path.split(head)[1]
-    agent_name = os.path.splitext(tail)[0]
-    return agent_name_delim.join([agent_type, agent_name])
-
-
-def read_image(path):
-    """read an image
-
-    :path: the path to the image
-    :returns: the image as a PIL.Image object
-
-    """
-    return Image.open(path)
-
-
-def read_orig(category):
-    """read the original image for a certain category
-
-    :category: the category to be read
-    :returns: the Image object
-
-    """
-    orig_path = get_existing_path(os.path.join(ROOT_DIR, *image_dir, category, 'orig'))
-    if not orig_path:
-        raise ModuleError(f"no orig image found in category {category}")
-    orig = read_image(orig_path)
-    return orig
-
-
-def read_output(category):
-    """read the output reference image for a certain category
-
-    :category: the category to be read
-    :returns: the Image object
-
-    """
-    output_path = get_existing_path(
-        os.path.join(ROOT_DIR, *image_dir, category, 'output'))
-    if not output_path:
-        raise ModuleError(f"no output image found in category {category}")
-    output = read_image(output_path)
-    return output
-
-
-def write_image(image, path, post_processors=[], override=True, verbose=True):
-    """read an image
-
-    :image: the image to be written as a PIL.Image object
-    :path: the path to the image
-    :post_processors: the processors to apply to the image before writing to the disk
-    :override: override existing files
-    :verbose: print output regarding writing status
-    :returns: None
-
-    """
-    if os.path.isfile(path):
-        if not override:
-            pif(verbose, f"image at {path} exists, not overriding")
-            return
-        else:
-            pif(verbose, f"overriding image at {path}")
-    for p in post_processors:
-        image = p(image)
-    image.save(path)
-    pif(verbose, f"successfully write to {path}")
-
-
-def get_existing_path(path, extensions=image_extensions):
-    """
-
-    :path: the path to a file
-    :extensions: an array specifying alternative extensions to use when the given path is not available
-    :returns: the resolved path, None if failed to resolve the image
-
-    """
-    path_root = os.path.splitext(path)[0]
-    options = [path] + [path_root + os.extsep + ext for ext in extensions]
-    for option in options:
-        if os.path.isfile(option):
-            return option
-    return None
-
-
-def read_level_image_paths(category, transformation):
-    """read the transformed image for a certain category
-
-    :category: the category to be read
-    :transformation: the specific transformation
-    :returns: an array of image paths that exist
-
-    """
-    base_path = os.path.join(ROOT_DIR, *image_dir, category, transformation)
-    level_paths = [
-        get_existing_path(
-            os.path.join(
-                base_path,
-                f"level_{level:02}")) for level in range(
-            0,
-            11)]
-    return list(filter(None, level_paths))
-
-
-def read_level_images(category, transformation):
-    """read the transformed image for a certain category
-
-    :category: the category to be read
-    :transformation: the specific transformation
-    :returns: an array of image objects
-
-    """
-    return [
-        read_image(path) for path in read_level_image_paths(
-            category,
-            transformation)]
-
-
-def rm(path, dryrun=False, verbose=True):
-    """ remove the file, or recursively remove directories
-
-    :path: the path to the file or directory
-    :dryrun: don't actually remove the file
-    :verbose: print out files/directories that will be removed
-    :returns: None
-
-    """
-    # helper function
-    def _rm(item, is_file=False):
-        pif(verbose, item)
-        if not dryrun:
-            if is_file:
-                os.remove(item)
-            else:
-                os.rmdir(item)
-
-    if os.path.isfile(path):
-        _rm(path, is_file=True)
-    elif os.path.isdir(path):
-        for root, directories, files in os.walk(path, topdown=False):
-            # remove files
-            for name in files:
-                full_name = os.path.join(root, name)
-                _rm(full_name, is_file=True)
-            # remove directories
-            for name in directories:
-                full_name = os.path.join(root, name)
-                _rm(full_name, is_file=False)
-        # remove the directory itself
-        _rm(path, is_file=False)
-    else:
-        raise ValueError(f"{path} does not point to a file or directory")
-
+from src.etc.consts import ROOT_DIR, transformation_dir, analysis_dir, image_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, printable_dir, image_extensions, csv_subfield_delim
+from src.etc.structure import validate_image_categories, validate_transformations, validate_metrics, get_image_category_names, get_transformation_names, get_metric_names, agent2file, file2agent, read_orig, read_output, get_existing_path, read_level_image_paths, read_level_images, get_level_numeric
 
 # --- transform utilities
 
@@ -383,21 +79,6 @@ def transform_image_by_category(
 # --- analyze utilities
 
 
-def get_level_numeric(filename):
-    """get the numeric level from filename
-
-    :filename: the file name of the level image. E.g. '.../level_00.jpg'
-    :returns: an integer representing the transformed level
-
-    """
-    match = re.search(
-        rf"level_(\d+)\.(?:{'|'.join(image_extensions)})$",
-        filename)
-    if not match:
-        raise ValueError(f"No numeric level found in filename {filename}")
-    return int(match.group(1))
-
-
 def rank_standard(f, categories, transformations, override, verbose):
     """ calculate spearman's rank for each category + transformation with each metrics.
     comparisons are made against the standard order (0-10),
@@ -415,8 +96,10 @@ def rank_standard(f, categories, transformations, override, verbose):
     # read the sorted data according to each agent (metrics or human)
     # can add a filter later to read only certain agents
     # need a way to name metrics and human agents uniformly
-    for csv_file in (ls(os.path.join(ROOT_DIR, *metric_sorted_data_dir),
-                        filtr=csv_filter) + ls(os.path.join(ROOT_DIR, *human_sorted_data_dir),
+    for csv_file in (ls(os.path.join(ROOT_DIR,
+                                     *metric_sorted_data_dir),
+                        filtr=csv_filter) + ls(os.path.join(ROOT_DIR,
+                                                            *human_sorted_data_dir),
                                                filtr=csv_filter)):
         # set up agent name
         row_r = {}  # row for coefficient
@@ -503,19 +186,6 @@ def generate_pdf(category, transformation, verbose):
         ROOT_DIR, *printable_dir, f"{category}_{transformation}.pdf")
     pdf.output(output_path)
     pif(verbose, f"File written to {output_path}")
-
-
-# --- info utilities
-
-
-def plist(lst, indent="", sep="\n"):
-    """print a list
-    :lst: the list to print
-    :indent: characters to append before each item
-    :sep: characters used to separate items
-    """
-    s = sep.join([indent + item for item in lst])
-    click.echo(s)
 
 # --- commands
 
@@ -777,7 +447,8 @@ def transform_clean(categories, transformations, dryrun, verbose):
     """ clean transformed images """
     for category in categories:
         # remove the reference output image
-        output_path = os.path.join(ROOT_DIR, *image_dir, category, "output.jpg")
+        output_path = os.path.join(
+            ROOT_DIR, *image_dir, category, "output.jpg")
         if os.path.isfile(output_path):
             rm(output_path, dryrun=dryrun, verbose=verbose)
         # remove images under each transformation
