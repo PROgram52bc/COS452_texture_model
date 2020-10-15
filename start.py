@@ -362,19 +362,22 @@ def transform_image_by_category(
     """
     orig = read_orig(category)
     for level in levels:
-        out = transform_image(orig, transformation, level)
-        out_path = os.path.join(ROOT_DIR, *image_dir, category, transformation)
-        os.makedirs(out_path, exist_ok=True)
+        out_dir = os.path.join(ROOT_DIR, *image_dir, category, transformation)
+        os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(
-            out_path,
+            out_dir,
             f"level_{level:02}" +
             os.extsep +
             extension)
+        # skip image computation if not overriding existing image
+        if os.path.isfile(out_path) and not override:
+            pif(verbose, f"skip image at {out_path}")
+            continue
+        out = transform_image(orig, transformation, level)
         write_image(
             out,
             out_path,
             post_processors=post_processors,
-            override=override,
             verbose=verbose)
 
 # --- analyze utilities
