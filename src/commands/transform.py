@@ -3,8 +3,9 @@ import os
 import importlib  # for dynamic import
 from src.etc.consts import ROOT_DIR, transformation_dir, image_dir
 from src.etc.structure import validate_image_categories, validate_transformations, get_image_category_names, get_transformation_names, read_orig
-from src.etc.postprocessors import crop_to_circle, add_orientation_marker
+from src.etc.postprocessors import crop_to_circle, add_orientation_marker, add_margin, add_border
 from src.etc.utilities import pif, write_image
+
 
 def transform_image(image, transformation, level):
     """ transforms an image
@@ -65,7 +66,10 @@ def transform_image_by_category(
 
 
 def create_transform_cli(cli):
-    transform = click.Group('transform', help="Transform images using available transformations")
+    transform = click.Group(
+        'transform',
+        help="Transform images using available transformations")
+
     @click.option("-c",
                   "--category",
                   "categories",
@@ -83,6 +87,8 @@ def create_transform_cli(cli):
     @click.option("--circle/--no-circle", "circle", default=True)
     @click.option("--orientation-mark/--no-orientation-mark",
                   "orientation", default=True)
+    @click.option("--margin", default=30)
+    @click.option("--border", default=1)
     @transform.command('all')
     def transform_all(
             categories,
@@ -90,25 +96,38 @@ def create_transform_cli(cli):
             verbose,
             override,
             circle,
-            orientation):
+            orientation,
+            margin,
+            border):
         """ Transform all existing images with all available transformations.
 
         if category is given, transform only the specified categories
         if transformation is given, transform with only the specified transformations
         by default, images will be cropped into a circle, can override this behavior with --no-circle
         if images are cropped, an orientation mark will by default be added, override this behavior with --no-orientation-mark
+
+
         """
         post_processors = []
         if circle:
             post_processors.append(crop_to_circle)
             if orientation:
                 post_processors.append(add_orientation_marker)
+        if margin:
+            post_processors.append(
+                lambda img: add_margin(
+                    img, margin_width=margin))
+        if border:
+            post_processors.append(
+                lambda img: add_border(
+                    img, border_width=border))
 
         for category in categories:
             pif(verbose, f"Processing category {category}...")
             # generate the unmodified reference image
             orig = read_orig(category)
-            out_path = os.path.join(ROOT_DIR, *image_dir, category, "output.jpg")
+            out_path = os.path.join(
+                ROOT_DIR, *image_dir, category, "output.jpg")
             write_image(
                 orig,
                 out_path,

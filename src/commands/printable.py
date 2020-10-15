@@ -6,7 +6,8 @@ from src.etc.consts import ROOT_DIR, printable_dir
 from src.etc.utilities import pif
 from src.etc.structure import validate_image_categories, validate_transformations, get_image_category_names, get_transformation_names, read_level_image_paths
 
-def generate_pdf(category, transformation, verbose):
+
+def generate_pdf(category, transformation, gap, verbose):
     """generate pdf file with transformed images
 
     :category: the category of image
@@ -23,7 +24,7 @@ def generate_pdf(category, transformation, verbose):
     # generate pdf
     pdf = FPDF(orientation="L", unit="pt", format="letter")
     pdf.set_auto_page_break(False)
-    pdf.set_margins(20, 20, 20)
+    pdf.set_margins(30, 30, 30)
     pdf.set_font('Arial', 'B', 20)
     pdf.add_page()
     pdf.cell(
@@ -41,11 +42,12 @@ def generate_pdf(category, transformation, verbose):
         border=0,
         ln=1,
         align="C")
-    lay_images(pdf, image_paths, width=240, space=10)
+    lay_images(pdf, image_paths, width=240, space=gap)
     output_path = os.path.join(
         ROOT_DIR, *printable_dir, f"{category}_{transformation}.pdf")
     pdf.output(output_path)
     pif(verbose, f"File written to {output_path}")
+
 
 def create_printable_cli(cli):
     printable = click.Group('printable', help="Generate printable documents")
@@ -62,9 +64,11 @@ def create_printable_cli(cli):
                   default=get_transformation_names(),
                   multiple=True,
                   callback=validate_transformations)
+    @click.option("--gap", default=5, show_default=True,
+                  help="The gap between each image")
     @click.option("--verbose/--silent", default=True)
     @printable.command('all')
-    def printable_all(categories, transformations, verbose):
+    def printable_all(categories, transformations, gap, verbose):
         """ generate printable files with the transformed images """
         os.makedirs(os.path.join(ROOT_DIR, *printable_dir), exist_ok=True)
         for category in categories:
@@ -72,6 +76,6 @@ def create_printable_cli(cli):
                 # read available level images
                 pif(verbose,
                     f"Generating printable for {category}, {transformation}...")
-                generate_pdf(category, transformation, verbose)
+                generate_pdf(category, transformation, gap, verbose)
 
     cli.add_command(printable)

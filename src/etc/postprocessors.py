@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw
 
+
 def crop_to_circle(img, max_radius=256, bg_color=(255, 255, 255)):
     """ crop the given image into a circle.
 
@@ -30,7 +31,27 @@ def crop_to_circle(img, max_radius=256, bg_color=(255, 255, 255)):
     result = Image.composite(img, bg, mask)
     return result
 
-def add_orientation_marker(img, marker_color=(0,0,0)):
+
+def add_margin(img, margin_width=10, margin_color=(255, 255, 255)):
+    """ add a margin around the image
+
+    :img: TODO
+    :margin_width: TODO
+    :returns: TODO
+
+    """
+    # create margin
+    width, height = img.size
+    margin_tray = Image.new(
+        "RGB",
+        (width + 2 * margin_width,
+         height + 2 * margin_width),
+        margin_color)
+    margin_tray.paste(img, (margin_width, margin_width))
+    return margin_tray
+
+
+def add_orientation_marker(img, marker_color=(0, 0, 0)):
     """ add orientation marker to an image
 
     :img: the input image
@@ -42,18 +63,32 @@ def add_orientation_marker(img, marker_color=(0,0,0)):
     width, height = img.size
     draw = ImageDraw.Draw(img)
     draw.line((
-        (marker_width//2-1,               height-marker_width//2-1-marker_length), 
-        (marker_width//2-1,               height-marker_width//2-1), 
-        (marker_width//2-1+marker_length, height-marker_width//2-1)),
+        (marker_width // 2 - 1, height - marker_width // 2 - 1 - marker_length),
+        (marker_width // 2 - 1, height - marker_width // 2 - 1),
+        (marker_width // 2 - 1 + marker_length, height - marker_width // 2 - 1)),
         fill=marker_color,
         width=marker_width,
         joint="curve")
     draw.line((
-        (width-marker_width//2-1,               height-marker_width//2-marker_length), 
-        (width-marker_width//2-1,               height-marker_width//2), 
-        (width-marker_width//2-1-marker_length, height-marker_width//2)),
+        (width - marker_width // 2 - 1, height - marker_width // 2 - marker_length),
+        (width - marker_width // 2 - 1, height - marker_width // 2),
+        (width - marker_width // 2 - 1 - marker_length, height - marker_width // 2)),
         fill=marker_color,
         width=marker_width,
         joint="curve")
     return img
 
+
+def add_border(img, border_width=1):
+    """add black border to the generated image """
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+    draw.line((
+        (0, 0),
+        (0, height - 1),
+        (width - 1, height - 1),
+        (width - 1, 0),
+        (0, 0)),
+        fill=(0, 0, 0),
+        width=border_width)
+    return img
