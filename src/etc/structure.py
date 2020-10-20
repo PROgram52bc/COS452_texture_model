@@ -1,43 +1,9 @@
 """ utilities related to the project structure, as specified in README.md """
 import os
+import click
 import re
 from .utilities import directory_filter, ls, read_image, csv_filter
 from src.etc.consts import ROOT_DIR, transformation_dir, analysis_dir, image_dir, sorted_data_dir, metric_sorted_data_dir, human_sorted_data_dir, agent_name_delim, image_extensions
-
-
-def validate_image_categories(ctx, param, value):
-    """ makes sure that the given image categories are valid """
-    invalid_categories = set(value) - set(get_image_category_names())
-    if invalid_categories:
-        raise ValueError(f"Invalid image categories: {invalid_categories}")
-    return value
-
-
-def validate_transformations(ctx, param, value):
-    """ makes sure that the given image transformations are valid """
-    invalid_transformations = set(value) - set(get_transformation_names())
-    if invalid_transformations:
-        raise ValueError(
-            f"Invalid image transformations: {invalid_transformations}")
-    return value
-
-
-def validate_metrics(ctx, param, value):
-    """ makes sure that the given image transformations are valid """
-    invalid_metrics = set(value) - set(get_metric_names())
-    if invalid_metrics:
-        raise ValueError(
-            f"Invalid image analysis names: {invalid_metrics}")
-    return value
-
-
-def validate_agent_names(ctx, param, value):
-    """ makes sure that the given agent names are valid """
-    invalid_agents = set(value) - set(get_agent_names())
-    if invalid_agents:
-        raise ValueError(
-            f"Invalid agent names: {invalid_agents}")
-    return value
 
 
 def get_image_category_names():
@@ -206,5 +172,5 @@ def get_level_numeric(filename):
         rf"level_(\d+)\.(?:{'|'.join(image_extensions)})$",
         filename)
     if not match:
-        raise ValueError(f"No numeric level found in filename {filename}")
+        raise click.BadParameter(f"No numeric level found in filename {filename}", ctx, param)
     return int(match.group(1))

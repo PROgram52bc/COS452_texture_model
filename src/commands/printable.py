@@ -4,7 +4,7 @@ from fpdf import FPDF
 from src.etc.pdf import lay_images
 from src.etc.consts import ROOT_DIR, printable_dir
 from src.etc.utilities import pif
-from src.etc.structure import validate_image_categories, validate_transformations, get_image_category_names, get_transformation_names, read_level_image_paths
+from src.etc.structure import get_image_category_names, get_transformation_names, read_level_image_paths
 
 
 def generate_pdf(category, transformation, gap, verbose):
@@ -57,13 +57,13 @@ def create_printable_cli(cli):
                   "categories",
                   default=get_image_category_names(),
                   multiple=True,
-                  callback=validate_image_categories)
+                  type=click.Choice(get_image_category_names()))
     @click.option("-t",
                   "--transformation",
                   "transformations",
                   default=get_transformation_names(),
                   multiple=True,
-                  callback=validate_transformations)
+                  type=click.Choice(get_transformation_names()))
     @click.option("--gap", default=5, show_default=True,
                   help="The gap between each image")
     @click.option("--verbose/--silent", default=True)

@@ -7,7 +7,7 @@ from scipy.stats import spearmanr
 
 from src.etc.exceptions import ModuleError
 from src.etc.utilities import pif, ls, csv_filter
-from src.etc.structure import validate_image_categories, validate_transformations, validate_metrics, validate_agent_names, get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
+from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
 from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim
 
 
@@ -29,8 +29,6 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
     for agent_name in agents:
         # set up data file path for the agent
         csv_file = agent2file(agent_name)
-        print("agent_name: {}".format(agent_name))
-        print("csv_file: {}".format(csv_file))
         row_r = {}  # row for coefficient
         row_p = {}  # row for p_value
         row_r['agent'] = csv_subfield_delim.join([agent_name, 'r'])
@@ -81,19 +79,19 @@ def create_analyze_cli(cli):
                   "categories",
                   default=get_image_category_names(),
                   multiple=True,
-                  callback=validate_image_categories)
+                  type=click.Choice(get_image_category_names()))
     @click.option("-t",
                   "--transformation",
                   "transformations",
                   default=get_transformation_names(),
                   multiple=True,
-                  callback=validate_transformations)
+                  type=click.Choice(get_transformation_names()))
     @click.option("-m",
                   "--metrics",
                   "metrics",
                   default=get_metric_names(),
                   multiple=True,
-                  callback=validate_metrics)
+                  type=click.Choice(get_metric_names()))
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
     @analyze.command()
@@ -151,19 +149,19 @@ def create_analyze_cli(cli):
                   "agents",
                   default=get_agent_names(),
                   multiple=True,
-                  callback=validate_agent_names)
+                  type=click.Choice(get_agent_names()))
     @click.option("-c",
                   "--category",
                   "categories",
                   default=get_image_category_names(),
                   multiple=True,
-                  callback=validate_image_categories)
+                  type=click.Choice(get_image_category_names()))
     @click.option("-t",
                   "--transformation",
                   "transformations",
                   default=get_transformation_names(),
                   multiple=True,
-                  callback=validate_transformations)
+                  type=click.Choice(get_transformation_names()))
     @click.option("--mode",
                   type=click.Choice(['standard',
                                      'human']),

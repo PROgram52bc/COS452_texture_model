@@ -1,7 +1,7 @@
 import click
 import os
 from src.etc.consts import ROOT_DIR, image_dir, metric_sorted_data_dir, printable_dir
-from src.etc.structure import validate_image_categories, validate_transformations, get_image_category_names, get_transformation_names
+from src.etc.structure import get_image_category_names, get_transformation_names
 from src.etc.utilities import rm
 
 
@@ -13,13 +13,13 @@ def create_clean_cli(cli):
                   "categories",
                   default=get_image_category_names(),
                   multiple=True,
-                  callback=validate_image_categories)
+                  type=click.Choice(get_image_category_names()))
     @click.option("-t",
                   "--transformation",
                   "transformations",
                   default=get_transformation_names(),
                   multiple=True,
-                  callback=validate_transformations)
+                  type=click.Choice(get_transformation_names()))
     @click.option("--dryrun/--no-dryrun", default=False)
     @click.option("--verbose/--silent", default=True)
     @clean.command('transform')

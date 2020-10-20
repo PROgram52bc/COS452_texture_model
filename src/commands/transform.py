@@ -2,7 +2,7 @@ import click
 import os
 import importlib  # for dynamic import
 from src.etc.consts import ROOT_DIR, transformation_dir, image_dir
-from src.etc.structure import validate_image_categories, validate_transformations, get_image_category_names, get_transformation_names, read_orig
+from src.etc.structure import get_image_category_names, get_transformation_names, read_orig
 from src.etc.postprocessors import crop_to_circle, add_orientation_marker, add_margin, add_border
 from src.etc.utilities import pif, write_image
 
@@ -75,13 +75,13 @@ def create_transform_cli(cli):
                   "categories",
                   default=get_image_category_names(),
                   multiple=True,
-                  callback=validate_image_categories)
+                  type=click.Choice(get_image_category_names()))
     @click.option("-t",
                   "--transformation",
                   "transformations",
                   default=get_transformation_names(),
                   multiple=True,
-                  callback=validate_transformations)
+                  type=click.Choice(get_transformation_names()))
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
     @click.option("--circle/--no-circle", "circle", default=True)
