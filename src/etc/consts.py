@@ -9,6 +9,8 @@ sorted_data_dir = ['data', 'sort']
 metric_sorted_data_dir = [*sorted_data_dir, 'metrics']
 human_sorted_data_dir = [*sorted_data_dir, 'humans']
 ranked_data_dir = ['data', 'rank']
+sequence_data_dir = ['data', 'sequence']
+sequence_filename = "sequences.json"
 printable_dir = ['printables']
 image_extensions = ['jpg', 'jpeg', 'png']
 

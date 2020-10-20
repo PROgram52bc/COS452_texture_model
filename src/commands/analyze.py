@@ -6,7 +6,7 @@ import importlib
 from scipy.stats import spearmanr
 
 from src.etc.exceptions import ModuleError
-from src.etc.utilities import pif, ls, csv_filter
+from src.etc.utilities import pif, ls, csv_filter, read_csv
 from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
 from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim
 
@@ -35,9 +35,7 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
         row_p['agent'] = csv_subfield_delim.join([agent_name, 'p'])
         pif(verbose, f"calculating ranks for {agent_name}...")
         # read file
-        with open(csv_file, newline='') as input_file:
-            reader = csv.reader(input_file)
-            header, *sorted_data = list(reader)
+        header, *sorted_data = read_csv(csv_file)
         for category_transformation, *order in sorted_data:
             # discard the label at the first column
             reference_order = header[1:]

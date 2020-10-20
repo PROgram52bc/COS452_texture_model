@@ -28,8 +28,13 @@
 
 -   `data/`: contains ranking data
 
+	-   `sequence/`: contains sequence related data
+		-   `sequences.json`: existing sequence mappings. Data has the
+			[following structure](#sequence-data-structure)
+
 	-   `sort/`
-		-   `humans/`: contains human sorted data, manually typed
+		-   `humans/`: contains human sorted data, converted from manually
+			typed data.
 
 			-   `<id>.csv`\*: data collected from person associated with `<id>`.
 				Data has the [following structure](#sorted-data-structure)
@@ -123,3 +128,15 @@
 > since Spearman's rank has both the coefficient and p-value as result, each
 > agent will occupy two rows instead of one row, whereas the first row contains
 > the coefficients and the second row contains the p-value.
+
+## sequence data structure
+
+```
+{
+	"category#transformation": ['A', 'B', 'C', 'D', 'E', ...],
+	...
+}
+```
+
+> Each key-item pair in the json file represents the symbol sequence used to
+> encode the transformed images, from the most similar to the least. 

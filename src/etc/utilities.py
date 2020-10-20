@@ -1,5 +1,7 @@
 import os
 import click
+import json
+import csv
 from PIL import Image
 
 def directory_filter(d):
@@ -110,6 +112,29 @@ def read_csv(path):
     """
     with open(path, newline='') as f:
         return list(csv.reader(f))
+
+
+def read_json(path):
+    """read json file as a python object
+
+    :path: path to the json file
+    :returns: the python object in the json file, None if file doesn't exist
+
+    """
+    with open(path) as f:
+        return json.load(f)
+
+
+def write_json(obj, path):
+    """write a json object into file 
+
+    :obj: the object to be written
+    :path: path to the json file
+    :returns: None
+
+    """
+    with open(path, "w") as f:
+        return json.dump(obj, f)
 
 
 def write_image(image, path, post_processors=[], override=True, verbose=True):
