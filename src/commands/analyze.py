@@ -7,15 +7,16 @@ from scipy.stats import spearmanr
 
 from src.etc.exceptions import ModuleError
 from src.etc.utilities import pif, ls, csv_filter
-from src.etc.structure import validate_image_categories, validate_transformations, validate_metrics, get_image_category_names, get_transformation_names, get_metric_names, file2agent, read_output, read_level_images, get_level_numeric
+from src.etc.structure import validate_image_categories, validate_transformations, validate_metrics, validate_agent_names, get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
 from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim
 
 
-def rank_standard(f, categories, transformations, override, verbose):
-    """ calculate spearman's rank for each category + transformation with each metrics.
-    comparisons are made against the standard order (0-10),
+def rank_standard(f, agents, categories, transformations, override, verbose):
+    """ calculate spearman's rank of each category + transformation with each agent.
+    comparisons are made against the standard order as listed in the header of each csv file (0-10),
 
     :f: the file to be written into
+    :agents: the agents to be considered
     :categories: the categories to be considered
     :transformations: the transformations to be considered
     :override: override existing files
@@ -25,21 +26,16 @@ def rank_standard(f, categories, transformations, override, verbose):
     """
     rows = []
     fieldnames = ['agent']
-    # read the sorted data according to each agent (metrics or human)
-    # can add a filter later to read only certain agents
-    # need a way to name metrics and human agents uniformly
-    for csv_file in (ls(os.path.join(ROOT_DIR,
-                                     *metric_sorted_data_dir),
-                        filtr=csv_filter) + ls(os.path.join(ROOT_DIR,
-                                                            *human_sorted_data_dir),
-                                               filtr=csv_filter)):
-        # set up agent name
+    for agent_name in agents:
+        # set up data file path for the agent
+        csv_file = agent2file(agent_name)
+        print("agent_name: {}".format(agent_name))
+        print("csv_file: {}".format(csv_file))
         row_r = {}  # row for coefficient
         row_p = {}  # row for p_value
-        agent = file2agent(csv_file)
-        row_r['agent'] = csv_subfield_delim.join([agent, 'r'])
-        row_p['agent'] = csv_subfield_delim.join([agent, 'p'])
-        pif(verbose, f"calculating ranks for {agent}...")
+        row_r['agent'] = csv_subfield_delim.join([agent_name, 'r'])
+        row_p['agent'] = csv_subfield_delim.join([agent_name, 'p'])
+        pif(verbose, f"calculating ranks for {agent_name}...")
         # read file
         with open(csv_file, newline='') as input_file:
             reader = csv.reader(input_file)
@@ -150,6 +146,12 @@ def create_analyze_cli(cli):
                             [category, transformation]), *order])
             pif(verbose, f"data written to {path}")
 
+    @click.option("-a",
+                  "--agents",
+                  "agents",
+                  default=get_agent_names(),
+                  multiple=True,
+                  callback=validate_agent_names)
     @click.option("-c",
                   "--category",
                   "categories",
@@ -170,7 +172,7 @@ def create_analyze_cli(cli):
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
     @analyze.command()
-    def rank(categories, transformations, mode, override, verbose):
+    def rank(agents, categories, transformations, mode, override, verbose):
         """ Calculate spearmanrank and p-value for each metric and transformation"""
         path = os.path.join(ROOT_DIR, *ranked_data_dir)
         os.makedirs(path, exist_ok=True)
@@ -182,6 +184,7 @@ def create_analyze_cli(cli):
             if mode == 'standard':
                 rank_standard(
                     f,
+                    agents,
                     categories,
                     transformations,
                     override,

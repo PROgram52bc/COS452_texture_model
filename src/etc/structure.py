@@ -1,8 +1,8 @@
 """ utilities related to the project structure, as specified in README.md """
 import os
 import re
-from .utilities import directory_filter, ls, read_image
-from src.etc.consts import ROOT_DIR, transformation_dir, analysis_dir, image_dir, sorted_data_dir, agent_name_delim, image_extensions
+from .utilities import directory_filter, ls, read_image, csv_filter
+from src.etc.consts import ROOT_DIR, transformation_dir, analysis_dir, image_dir, sorted_data_dir, metric_sorted_data_dir, human_sorted_data_dir, agent_name_delim, image_extensions
 
 
 def validate_image_categories(ctx, param, value):
@@ -28,6 +28,15 @@ def validate_metrics(ctx, param, value):
     if invalid_metrics:
         raise ValueError(
             f"Invalid image analysis names: {invalid_metrics}")
+    return value
+
+
+def validate_agent_names(ctx, param, value):
+    """ makes sure that the given agent names are valid """
+    invalid_agents = set(value) - set(get_agent_names())
+    if invalid_agents:
+        raise ValueError(
+            f"Invalid agent names: {invalid_agents}")
     return value
 
 
@@ -64,6 +73,20 @@ def get_metric_names():
         mapper=os.path.basename)
 
 
+def get_agent_names():
+    """gets all available agent names as listed data/sort directory
+
+    :returns: a list of agent names in the form of (humans|metrics)#name
+
+    """
+    return (ls(os.path.join(ROOT_DIR, *metric_sorted_data_dir),
+               filtr=csv_filter,
+               mapper=file2agent) +
+            ls(os.path.join(ROOT_DIR, *human_sorted_data_dir),
+               filtr=csv_filter,
+               mapper=file2agent))
+
+
 def agent2file(agent):
     """convert an agent name to file path
 
@@ -73,9 +96,7 @@ def agent2file(agent):
     """
     return os.path.join(
         ROOT_DIR, *sorted_data_dir,
-        *agent.split(agent_name_delim),
-        os.extsep,
-        'csv')
+        *agent.split(agent_name_delim)) + os.extsep + 'csv'
 
 
 def file2agent(filename):
@@ -173,6 +194,7 @@ def read_level_images(category, transformation):
             category,
             transformation)]
 
+
 def get_level_numeric(filename):
     """get the numeric level from filename
 
@@ -186,5 +208,3 @@ def get_level_numeric(filename):
     if not match:
         raise ValueError(f"No numeric level found in filename {filename}")
     return int(match.group(1))
-
-
