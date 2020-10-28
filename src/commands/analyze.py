@@ -67,6 +67,22 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
     writer.writerows(rows)
 
 
+def mean_order(*orders):
+    """calculate the mean ordering of several orderings
+
+    :*orders: lists that contains the same elements but in different orders
+    :returns: a list representing the mean (average) order
+    """
+    # FIXME: When an even number of orders is evaluated, a tie might occur <2020-10-28, David Deng> #
+    rank = {}
+    for order in orders:
+        for index, item in enumerate(order):
+            # collect the index (ranking) for each item
+            rank.setdefault(item, 0)
+            rank[item] += index
+    return sorted(rank.keys(), key=lambda e: rank[e])
+
+
 def create_analyze_cli(cli):
     analyze = click.Group(
         'analyze',
