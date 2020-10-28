@@ -8,21 +8,28 @@ from src.etc.consts import ROOT_DIR, sequence_data_dir, sequence_filename
 from string import ascii_lowercase, ascii_uppercase
 
 sequence_path = os.path.join(ROOT_DIR, *sequence_data_dir, sequence_filename)
+sequences_cache = {}
 
 
 def read_sequences():
     """read existing sequences from the sequence file
-    :returns: a python object
+    :returns: a python object, where the key is the name of the sequence, and value is the sequence as a list
 
     """
+    global sequences_cache
+    if sequences_cache:
+        # print("returning from cache")
+        return sequences_cache
     if not os.path.isfile(sequence_path):
         return {}
     try:
-        return read_json(
+        # print("reading from file")
+        sequences_cache = read_json(
             os.path.join(
                 ROOT_DIR,
                 *sequence_data_dir,
                 sequence_filename))
+        return sequences_cache
     except FileNotFoundError:
         return {}
     except json.decoder.JSONDecodeError as e:
@@ -30,15 +37,29 @@ def read_sequences():
             f"invalid file structure in {sequence_filename}: {e}")
 
 
+def read_sequence(sequence_name):
+    """read a particular existing sequence
+
+    :sequence_name: the name of the existing sequence. If sequence_name does not exist, the input sequence is returned as is. E.g. 'wheat_noise'
+    :returns: the request sequence as list, None if doesn't exist
+
+    """
+    return read_sequences().get(sequence_name, None)
+
+
 def decode_sequence(sequence_name, input_sequence):
     """ decode an ordering according to the specified existing sequence
 
-    :sequence_name: the name of the existing sequence. If sequence_name does not exist, the input sequence is returned as is.
+    :sequence_name: the name of the existing sequence. If sequence_name does not exist, the input sequence is returned as is. E.g. 'wheat_noise'
     :input_sequence: the given ordering encoded with sequence_name
     :returns: the output sequence consisting of integers starting from 0
 
     """
-    pass
+    sequence_keys = read_sequence(sequence_name)
+    if not sequence_keys:
+        return input_sequence
+    sequence_map = { key: index for index, key in enumerate(sequence_keys) }
+    return [ sequence_map[key] for key in input_sequence ]
 
 
 def write_sequences(sequences):
@@ -52,6 +73,35 @@ def write_sequences(sequences):
             ROOT_DIR,
             *sequence_data_dir,
             sequence_filename))
+    # print("update cache")
+    global sequences_cache
+    sequences_cache = sequences
+
+
+def write_sequence(sequence_name, sequence):
+    """write a single sequence into the sequence collection.
+    will overwrite existing sequence_name
+
+    :sequence_name: the name of the sequence to be written
+    :sequence: the actual sequence
+    :returns: None
+
+    """
+    write_sequences({**read_sequences(), sequence_name: sequence})
+
+
+
+def remove_sequence(sequence_name):
+    """remove a sequence from the storage
+
+    :sequence_name: the name of the sequence to be removed
+    :returns: the sequence removed, None if sequence does not exist
+
+    """
+    sequences = read_sequences()
+    removed = sequences.pop(sequence_name, None)
+    write_sequences(sequences)
+    return removed
 
 
 def generate_random_sequence(
@@ -121,17 +171,30 @@ def create_sequence_cli(cli):
             replacement,
             truncate,
             verbose):
-        sequences = read_sequences()
-        if not force and name in sequences.keys():
+        if not force and read_sequence(name):
             click.echo(
                 f"{name} already exists in sequence data, choose another one or use --force to override")
             return
         sequence = generate_random_sequence(
             count, set_name, replacement, truncate)
-        sequences[name] = sequence
-        write_sequences(sequences)
+        write_sequence(name, sequence)
         pif(verbose,
-            f"Successfully added new sequence {name}: {','.join(sequence)}")
+            f"Successfully added new sequence [{name}]: {', '.join(sequence)}")
+
+    @click.option("-n", "--name", required=True)
+    @click.option("-f", "--force", is_flag=True, default=False)
+    @click.option("--verbose/--silent", default=True)
+    @sequence.command('delete')
+    def delete_sequence(name, force, verbose):
+        if not read_sequence(name):
+            click.echo(f"Sequence [{name}] does not exist")
+            return
+        elif not force:
+            click.echo(f"Use --force to confirm action. Caution: This operation is not reversible")
+            return
+        sequence = remove_sequence(name)
+        pif(verbose, f"Sequence [{name}] removed:\n{', '.join(sequence)}")
+
 
     @click.option("-n", "--name", "names", multiple=True)
     @sequence.command('list')
