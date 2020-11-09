@@ -1,4 +1,96 @@
+# Workflow
+
+## Preparation
+### Add a sample image
+
+Images must first be added before being transformed and analyzed.
+Each sample image has a unique name, and we will refer to that name as its "category."
+Some example "categories" can be: "brick," "dirt," etc.
+
+To add a new sample image,
+
+1. Create a directory under the `images` directory with the name of the image
+   category.
+1. Copy your sample image to the `images/<category>` directory. The sample
+   image must be named "orig.jpg".
+
+Instead of `jpg` format, `jpeg` or `png` can also be used. When multiple
+options are available, images are resolved in the following priority:
+
+1. jpg
+1. jpeg
+1. png
+
+### Add a transformation
+
+The sample images you added in the previous step can be transformed using
+various transformations.  Each transformation is defined by a single python
+function with the following signature:
+
+```python
+transform(img: PIL.Image, level: int): PIL.Image
+```
+
+It accepts as the first argument an `Image` object defined by the PIL library,
+each of the sample images will be passed to the function via this argument.
+
+It accepts an integer as the second argument, representing the level of
+transformation.
+
+It returns a new `Image` object, which is the transformed image.
+
+If `level == 0`, the returned image should be identical to `img`, the function
+should support a range of `level` from 0 to 10.
+
+To add the transformation,
+
+1. Create a directory under the `src/transformations` directory with the name
+   of the transformation.
+1. Create a file named `__init__.py` under the
+   `src/transformations/<transformation>` directory.
+1. Define a function named `transform` in
+   `src/transformations/<transformation>/__init__.py`. The function should have
+   the signature and standard as described above.
+
+Some sample transformations are implemented in `src/transformations/` directory
+for reference.
+
+### Add a metric
+
+## Image manipulation
+
+### Transform
+
+### Analyze
+
+## Human data
+
+### Sequence
+
+### Printables
+
 # Project structure
+
+This section describes the overall project structure.
+
+> __Legends__:
+
+> Each list item is either a directory or a file, or multiple
+> directories/files, if they are followed with a asterisk ("\*") sign
+
+> Each list item has two parts, separated by a colon (":"), the part before
+> the colon is the name of the directory or the file, while the part after
+> the colon is a description for the directory or the file.
+
+> `directory/` names are followed by a slash, while `file` names are not
+> followed by a slash.
+
+> sub-directories and files for a given directory are nested below the
+> given directory.
+
+> if a name of a directory or a file contains a word surrounded by angle
+> bracket (`<placeholder>`), the word is a placeholder that can be replaced
+> by specific names according to the description.
 
 -   `start.py`: executable script implementing commands that can transform or
     analyze images accordingly
@@ -71,26 +163,7 @@
 
 -   `env.sh`: to be sourced before running the project
 
-> __Legends__:
-
-> Each list item is either a directory or a file, or multiple
-> directories/files, if they are followed with a asterisk ("\*") sign
-
-> Each list item has two parts, separated by a colon (":"), the part before
-> the colon is the name of the directory or the file, while the part after
-> the colon is a description for the directory or the file.
-
-> `directory/` names are followed by a slash, while `file` names are not
-> followed by a slash.
-
-> sub-directories and files for a given directory are nested below the
-> given directory.
-
-> if a name of a directory or a file contains a word surrounded by angle
-> bracket (`<placeholder>`), the word is a placeholder that can be replaced
-> by specific names according to the description.
-
-# CSV file structures
+# Data file structures
 
 ## sorted data structure
 | dataset                       | 1   | 2   | ... |
@@ -140,3 +213,14 @@
 
 > Each key-item pair in the json file represents the symbol sequence used to
 > encode the transformed images, from the most similar to the least. 
+
+# Notes
+
+## Imagemagick commands
+
+To tile images, use the `montage` command:
+
+```bash
+# make a demo tile image for level01-10 with label
+$ montage -label "%t" -tile 5x2 level_{[0][1-9],10}*.jpg combined.jpg
+```
