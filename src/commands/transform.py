@@ -26,7 +26,7 @@ def transform_image(image, transformation, level):
     new_image = transform(image, level)
     return new_image
 
-
+# TODO: change transform all to 'image transform'? <2020-11-13, David Deng> #
 def transform_image_by_category(
         category,
         transformation,

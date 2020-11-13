@@ -8,6 +8,7 @@ image_dir = ['images']
 sorted_data_dir = ['data', 'sort']
 metric_sorted_data_dir = [*sorted_data_dir, 'metrics']
 human_sorted_data_dir = [*sorted_data_dir, 'humans']
+raw_sorted_data_dir = [*sorted_data_dir, 'raw'] # raw human data to be decoded into human_sorted_data_dir
 ranked_data_dir = ['data', 'rank']
 sequence_data_dir = ['data', 'sequence']
 sequence_filename = "sequences.json"

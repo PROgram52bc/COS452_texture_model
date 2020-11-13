@@ -1,5 +1,7 @@
 # Workflow
 
+This section describes the typical workflow for using this tool.
+
 ## Preparation
 ### Add a sample image
 
@@ -190,17 +192,13 @@ This section describes the overall project structure.
 > the symbols are consistent across different rows.
 
 ## ranked data structure
-| agent        | `<category>_<transformation>` | `<category>_<transformation>` | ... |
-| ------------ | ----------------------------- | ----------------------------- | --- |
-| `<agent1>_r` | 0.8                           | 1                             | ... |
-| `<agent1>_p` | 0.002                         | 0                             | ... |
-| `<agent2>_r` | ...                           | ...                           | ... |
-| `<agent2>_p` | ...                           | ...                           | ... |
-| ...          | ...                           | ...                           | ... |
 
-> since Spearman's rank has both the coefficient and p-value as result, each
-> agent will occupy two rows instead of one row, whereas the first row contains
-> the coefficients and the second row contains the p-value.
+| AGENT     | CATEGORY     | TRANSFORMATION     | spearman rank | p-value |
+| --------- | ------------ | ------------------ | ------------- | ------- |
+| `<agent>` | `<category>` | `<transformation>` | 1             | 0       |
+| `<agent>` | `<category>` | `<transformation>` | 0.39          | 0.235   |
+| `<agent>` | `<category>` | `<transformation>` | 0.81          | 0.003   |
+| ...       | ...          | ...                | ...           | ...     |
 
 ## sequence data structure
 
@@ -221,6 +219,6 @@ This section describes the overall project structure.
 To tile images, use the `montage` command:
 
 ```bash
-# make a demo tile image for level01-10 with label
+# make a demo tile image for level 01-10 with label
 $ montage -label "%t" -tile 5x2 level_{[0][1-9],10}*.jpg combined.jpg
 ```

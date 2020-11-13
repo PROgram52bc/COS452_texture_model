@@ -24,20 +24,30 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
     :returns: None
 
     """
-    rows = []
-    fieldnames = ['agent']
-    for agent_name in agents:
+    writer = csv.writer(f)
+    # The header line
+    writer.writerow([
+        'agent',
+        'category',
+        'transformation',
+        'coefficient',
+        'p-value'
+    ])
+    for agent in agents:
         # set up data file path for the agent
-        csv_file = agent2file(agent_name)
-        row_r = {}  # row for coefficient
-        row_p = {}  # row for p_value
-        row_r['agent'] = csv_subfield_delim.join([agent_name, 'r'])
-        row_p['agent'] = csv_subfield_delim.join([agent_name, 'p'])
-        pif(verbose, f"calculating ranks for {agent_name}...")
+        csv_file = agent2file(agent)
+        if not csv_filter(csv_file):
+            pif(verbose,
+                f"{csv_file} does not exist, use the 'decode' command to generate sorted data.")
+            continue
+        pif(verbose, f"calculating ranks for {agent}...")
         # read file
+        # the header row and array of data rows
         header, *sorted_data = read_csv(csv_file)
+        # TODO: split category_transformation into two separate fields
+        # <2020-11-13, David Deng> #
         for category_transformation, *order in sorted_data:
-            # discard the label at the first column
+            # get the reference order from the header row
             reference_order = header[1:]
             category, transformation = category_transformation.split(
                 csv_subfield_delim)
@@ -50,22 +60,13 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
                 pif(verbose,
                     f"Transformation {transformation} not specified, skipping {category}, {transformation}...")
                 continue
-            if category_transformation not in fieldnames:
-                # add field name if encountering a new one
-                fieldnames.append(category_transformation)
             r, p = spearmanr(reference_order, order)  # calculate spm-rank
-            # cell = csv_subfield_delim.join(map(lambda v: str(numpy.round(v,
-            # decimals=3)), result)) # combine coefficient and p_value into a
-            # single cell
-            row_r[category_transformation] = str(numpy.round(r, decimals=2))
-            row_p[category_transformation] = str(numpy.round(p, decimals=3))
-
-        rows.append(row_r)
-        rows.append(row_p)
-    writer = csv.DictWriter(f, fieldnames=fieldnames)
-    writer.writeheader()
-    writer.writerows(rows)
-
+            writer.writerow([
+                agent,
+                category,
+                transformation,
+                str(numpy.round(r, decimals=3)),
+                str(numpy.round(p, decimals=3))])
 
 def mean_order(*orders):
     """calculate the mean ordering of several orderings
@@ -73,7 +74,8 @@ def mean_order(*orders):
     :*orders: lists that contains the same elements but in different orders
     :returns: a list representing the mean (average) order
     """
-    # FIXME: When an even number of orders is evaluated, a tie might occur <2020-10-28, David Deng> #
+    # FIXME: When an even number of orders is evaluated, a tie might occur
+    # <2020-10-28, David Deng> #
     rank = {}
     for order in orders:
         for index, item in enumerate(order):
@@ -83,6 +85,7 @@ def mean_order(*orders):
     return sorted(rank.keys(), key=lambda e: rank[e])
 
 
+# TODO: change analyze to data?  <2020-11-13, David Deng> #
 def create_analyze_cli(cli):
     analyze = click.Group(
         'analyze',
@@ -176,32 +179,24 @@ def create_analyze_cli(cli):
                   default=get_transformation_names(),
                   multiple=True,
                   type=click.Choice(get_transformation_names()))
-    @click.option("--mode",
-                  type=click.Choice(['standard',
-                                     'human']),
-                  default="standard",
-                  help="'standard' mode will rank against the normal ordering (0-10), while 'human' mode will rank against human ratings")
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
     @analyze.command()
-    def rank(agents, categories, transformations, mode, override, verbose):
+    def rank(agents, categories, transformations, override, verbose):
         """ Calculate spearmanrank and p-value for each metric and transformation"""
         path = os.path.join(ROOT_DIR, *ranked_data_dir)
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"{mode}.csv")
+        file_path = os.path.join(path, "rank.csv")
         if os.path.isfile(file_path) and not override:
             pif(verbose, f"file at {file_path} exists, skipping...")
             return
         with open(file_path, "w", newline='') as f:
-            if mode == 'standard':
-                rank_standard(
-                    f,
-                    agents,
-                    categories,
-                    transformations,
-                    override,
-                    verbose)
-            else:
-                pass
+            rank_standard(
+                f,
+                agents,
+                categories,
+                transformations,
+                override,
+                verbose)
         pif(verbose, f"data written into {file_path}")
     cli.add_command(analyze)
