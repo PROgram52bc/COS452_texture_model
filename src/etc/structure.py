@@ -14,7 +14,7 @@ def get_image_category_names():
         os.path.join(
             ROOT_DIR, *image_dir),
         filtr=is_directory,
-        mapper=os.path.basename)
+        relative_to_cwd=False)
 
 
 def get_transformation_names():
@@ -25,7 +25,7 @@ def get_transformation_names():
         os.path.join(
             ROOT_DIR, *transformation_dir),
         filtr=is_directory,
-        mapper=os.path.basename)
+        relative_to_cwd=False)
 
 
 def get_metric_names():
@@ -36,7 +36,7 @@ def get_metric_names():
         os.path.join(
             ROOT_DIR, *analysis_dir),
         filtr=is_directory,
-        mapper=os.path.basename)
+        relative_to_cwd=False)
 
 
 def get_agent_names():

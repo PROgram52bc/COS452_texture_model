@@ -5,6 +5,7 @@ import json
 from click import ClickException
 from src.etc.utilities import plist, read_json, write_json, pif
 from src.etc.consts import ROOT_DIR, sequence_data_dir, sequence_filename
+from src.etc.exceptions import SequenceError
 from string import ascii_lowercase, ascii_uppercase
 
 sequence_path = os.path.join(ROOT_DIR, *sequence_data_dir, sequence_filename)
@@ -47,19 +48,36 @@ def read_sequence(sequence_name):
     return read_sequences().get(sequence_name, None)
 
 
-def decode_sequence(sequence_name, input_sequence):
+def decode_sequence(sequence_name, input_sequence, strict=True):
     """ decode an ordering according to the specified existing sequence
 
     :sequence_name: the name of the existing sequence. If sequence_name does not exist, the input sequence is returned as is. E.g. 'wheat_noise'
     :input_sequence: the given ordering encoded with sequence_name
+    :strict: raise error when detected malformed input sequences
     :returns: the output sequence consisting of integers starting from 0
 
     """
     sequence_keys = read_sequence(sequence_name)
     if not sequence_keys:
+        if strict:
+            raise SequenceError(f"Invalid sequence name {sequence_name}")
         return input_sequence
+    if strict:
+        input_length = len(input_sequence)
+        set_length = len(set(input_sequence))
+        key_length = len(sequence_keys)
+        # given sequence must have the same length as sequence_keys
+        if input_length != key_length:
+            raise SequenceError(f"Sequence lengths do not match: {input_length} != {key_length}")
+        # given sequence must not have repetitive elements
+        if input_length != set_length:
+            raise SequenceError(f"Given sequence contains repetitive element")
     sequence_map = { key: index for index, key in enumerate(sequence_keys) }
-    return [ sequence_map[key] for key in input_sequence ]
+    try:
+        return [ sequence_map[key] for key in input_sequence ]
+    except KeyError as e:
+        # given sequence must not have unknown elements
+        raise SequenceError(f"Unknown symbol in sequence: {e}")
 
 
 def write_sequences(sequences):

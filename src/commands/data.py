@@ -5,10 +5,11 @@ import numpy
 import importlib
 from scipy.stats import spearmanr
 
-from src.etc.exceptions import ModuleError
+from src.commands.sequence import decode_sequence
+from src.etc.exceptions import ModuleError, SequenceError
 from src.etc.utilities import pif, ls, is_csv, read_csv
 from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
-from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim
+from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim, raw_sorted_data_dir
 
 
 def rank_standard(f, agents, categories, transformations, override, verbose):
@@ -67,6 +68,7 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
                 transformation,
                 str(numpy.round(r, decimals=3)),
                 str(numpy.round(p, decimals=3))])
+
 
 def mean_order(*orders):
     """calculate the mean ordering of several orderings
@@ -161,8 +163,6 @@ def create_data_cli(cli):
                             [category, transformation]), *order])
             pif(verbose, f"data written to {path}")
 
-
-
     @click.option("-a",
                   "--agents",
                   "agents",
@@ -201,4 +201,30 @@ def create_data_cli(cli):
                 override,
                 verbose)
         pif(verbose, f"data written into {file_path}")
+
+    @click.option("-a",
+                  "--raw-file",
+                  "file_names",
+                  multiple=True,
+                  type=click.Choice(ls(os.path.join(*raw_sorted_data_dir), filtr=is_csv, relative_to_cwd=False)),
+                  default=ls(os.path.join(*raw_sorted_data_dir), filtr=is_csv, relative_to_cwd=False))
+    @click.option("--verbose/--silent", default=True)
+    @data.command('decode', help="decode raw data into human data")
+    def decode_command(file_names, verbose):
+        for file_name in file_names:
+            input_path = os.path.join(*raw_sorted_data_dir, file_name)
+            output_path = os.path.join(*human_sorted_data_dir, file_name)
+            header_line, *rows = read_csv(input_path)
+            with open(output_path, "w") as output_file:
+                writer = csv.writer(output_file)
+                pif(verbose, f"Decoding {file_name}...")
+                writer.writerow(header_line)
+                for sequence_name, *sequence in rows:
+                    try:
+                        writer.writerow([sequence_name, *decode_sequence(sequence_name, sequence)])
+                    except SequenceError as e:
+                        click.echo(f"Sequence Error in {input_path}: {sequence_name}")
+                        click.echo(e)
+            pif(verbose, f"Successfully written decoded sequences into {output_path}")
+
     cli.add_command(data)

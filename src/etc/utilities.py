@@ -10,8 +10,8 @@ def is_directory(d):
 
 
 def is_csv(f):
-    """ returns True if 'f' is a valid csv file, False otherwise """
-    return os.path.isfile(f) and os.path.splitext(f)[1] == '.csv'
+    """ returns True if 'f' ends with .csv, False otherwise """
+    return os.path.splitext(f)[1] == '.csv'
 
 
 def plist(lst, indent="", sep="\n"):
@@ -36,13 +36,14 @@ def pif(verbose, msg):
         click.echo(msg)
 
 
-def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
+def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item, relative_to_cwd=True):
     """returns a list of strings of each file/directories in _directory_
-    The strings will be relative to the current directory
 
     :directory: the directory to list, defaults to the current directory
     :filtr: the filter function to apply on each returned element
     :mapper: the mapper function to transform each returned element, applied after filter function
+    :relative_to_cwd: the returned string is relative to current working directory rather than the given directory,
+    _filtr_ and _mapper_ will always be applied with the paths relative to cwd.
     :returns: a list of strings, empty if the directory does not exist
     """
     # check for non-existing directory
@@ -54,6 +55,8 @@ def ls(directory=None, filtr=lambda item: True, mapper=lambda item: item):
         items = map(lambda item: os.path.join(directory, item), items)
     items = filter(filtr, items)
     items = map(mapper, items)
+    if not relative_to_cwd:
+        items = map(os.path.basename, items)
     return list(items)
 
 
