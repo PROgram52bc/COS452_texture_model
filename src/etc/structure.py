@@ -2,7 +2,7 @@
 import os
 import click
 import re
-from .utilities import directory_filter, ls, read_image, csv_filter
+from .utilities import is_directory, ls, read_image, is_csv
 from src.etc.consts import ROOT_DIR, transformation_dir, analysis_dir, image_dir, sorted_data_dir, metric_sorted_data_dir, human_sorted_data_dir, agent_name_delim, image_extensions
 
 
@@ -13,7 +13,7 @@ def get_image_category_names():
     return ls(
         os.path.join(
             ROOT_DIR, *image_dir),
-        filtr=directory_filter,
+        filtr=is_directory,
         mapper=os.path.basename)
 
 
@@ -24,7 +24,7 @@ def get_transformation_names():
     return ls(
         os.path.join(
             ROOT_DIR, *transformation_dir),
-        filtr=directory_filter,
+        filtr=is_directory,
         mapper=os.path.basename)
 
 
@@ -35,7 +35,7 @@ def get_metric_names():
     return ls(
         os.path.join(
             ROOT_DIR, *analysis_dir),
-        filtr=directory_filter,
+        filtr=is_directory,
         mapper=os.path.basename)
 
 
@@ -46,10 +46,10 @@ def get_agent_names():
 
     """
     return (ls(os.path.join(ROOT_DIR, *metric_sorted_data_dir),
-               filtr=csv_filter,
+               filtr=is_csv,
                mapper=file2agent) +
             ls(os.path.join(ROOT_DIR, *human_sorted_data_dir),
-               filtr=csv_filter,
+               filtr=is_csv,
                mapper=file2agent))
 
 

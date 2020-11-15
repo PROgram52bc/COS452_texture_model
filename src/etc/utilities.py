@@ -4,12 +4,12 @@ import json
 import csv
 from PIL import Image
 
-def directory_filter(d):
+def is_directory(d):
     """ returns True if 'd' is a valid directory, False otherwise """
     return os.path.isdir(d) and not os.path.basename(d).startswith('_')
 
 
-def csv_filter(f):
+def is_csv(f):
     """ returns True if 'f' is a valid csv file, False otherwise """
     return os.path.isfile(f) and os.path.splitext(f)[1] == '.csv'
 

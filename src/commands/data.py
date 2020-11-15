@@ -6,7 +6,7 @@ import importlib
 from scipy.stats import spearmanr
 
 from src.etc.exceptions import ModuleError
-from src.etc.utilities import pif, ls, csv_filter, read_csv
+from src.etc.utilities import pif, ls, is_csv, read_csv
 from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
 from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim
 
@@ -36,7 +36,7 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
     for agent in agents:
         # set up data file path for the agent
         csv_file = agent2file(agent)
-        if not csv_filter(csv_file):
+        if not is_csv(csv_file):
             pif(verbose,
                 f"{csv_file} does not exist, use the 'decode' command to generate sorted data.")
             continue
@@ -74,7 +74,8 @@ def mean_order(*orders):
     :*orders: lists that contains the same elements but in different orders
     :returns: a list representing the mean (average) order
     """
-    # FIXME: When an even number of orders is evaluated, a tie might occur
+    # When an even number of orders is evaluated, a tie might occur
+    # But this function is not currently used.
     # <2020-10-28, David Deng> #
     rank = {}
     for order in orders:
@@ -85,11 +86,10 @@ def mean_order(*orders):
     return sorted(rank.keys(), key=lambda e: rank[e])
 
 
-# TODO: change analyze to data?  <2020-11-13, David Deng> #
-def create_analyze_cli(cli):
-    analyze = click.Group(
-        'analyze',
-        help="Analyze transformed images with available metrics")
+def create_data_cli(cli):
+    data = click.Group(
+        'data',
+        help="Process numerical data")
 
     @click.option("-c",
                   "--category",
@@ -111,7 +111,7 @@ def create_analyze_cli(cli):
                   type=click.Choice(get_metric_names()))
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
-    @analyze.command()
+    @data.command()
     def sort(categories, transformations, metrics, override, verbose):
         """sort the generated images by comparing them with output.jpg """
         os.makedirs(
@@ -161,6 +161,8 @@ def create_analyze_cli(cli):
                             [category, transformation]), *order])
             pif(verbose, f"data written to {path}")
 
+
+
     @click.option("-a",
                   "--agents",
                   "agents",
@@ -181,7 +183,7 @@ def create_analyze_cli(cli):
                   type=click.Choice(get_transformation_names()))
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
-    @analyze.command()
+    @data.command()
     def rank(agents, categories, transformations, override, verbose):
         """ Calculate spearmanrank and p-value for each metric and transformation"""
         path = os.path.join(ROOT_DIR, *ranked_data_dir)
@@ -199,4 +201,4 @@ def create_analyze_cli(cli):
                 override,
                 verbose)
         pif(verbose, f"data written into {file_path}")
-    cli.add_command(analyze)
+    cli.add_command(data)

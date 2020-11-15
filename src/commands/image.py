@@ -65,10 +65,10 @@ def transform_image_by_category(
             verbose=verbose)
 
 
-def create_transform_cli(cli):
-    transform = click.Group(
-        'transform',
-        help="Transform images using available transformations")
+def create_image_cli(cli):
+    image = click.Group(
+        'image',
+        help="Process images")
 
     @click.option("-c",
                   "--category",
@@ -89,7 +89,7 @@ def create_transform_cli(cli):
                   "orientation", default=True)
     @click.option("--margin", default=30)
     @click.option("--border", default=1)
-    @transform.command('all')
+    @image.command('transform')
     def transform_all(
             categories,
             transformations,
@@ -99,7 +99,7 @@ def create_transform_cli(cli):
             orientation,
             margin,
             border):
-        """ Transform all existing images with all available transformations.
+        """ Transform images with available transformations.
 
         if category is given, transform only the specified categories
         if transformation is given, transform with only the specified transformations
@@ -143,4 +143,4 @@ def create_transform_cli(cli):
                     post_processors=post_processors,
                     override=override,
                     verbose=verbose)
-    cli.add_command(transform)
+    cli.add_command(image)
