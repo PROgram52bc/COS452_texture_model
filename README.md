@@ -216,9 +216,34 @@ This section describes the overall project structure.
 
 ## Imagemagick commands
 
-To tile images, use the `montage` command:
+## Show levels of transformations
+To show various transformations, execute the following in any `images/<category>/<transformation>/` directory:
 
 ```bash
-# make a demo tile image for level 01-10 with label
-$ montage -label "%t" -tile 5x2 level_{[0][1-9],10}*.jpg combined.jpg
+montage -pointsize 60 -geometry "48x48+5+5<" -label "%t" -tile 5x2 level_{[0][1-9],10}*.jpg levels.jpg
 ```
+Sample output:
+
+![transformation level showcase](assets/levels.jpg)
+
+## Show transformations
+To show various transformations, execute the following in any `images/<category>/` directory:
+```bash
+mkdir tmp
+for transformed in */level_05.jpg; do cp $transformed ./tmp/${transformed%%/*}.jpg; done
+montage -pointsize 50 -geometry "48x48+5+5<" -label "%t" -tile 3x2 \( output.jpg -set label original \) tmp/* transformations.jpg
+rm -rf tmp
+```
+Sample output:
+
+![transformations showcase](assets/transformations.jpg)
+
+## Show textures
+To show available texture images, execute the following in `images/` directory:
+```bash
+# assumes blue_carpet,dirt,fur,shirt are existing categories
+montage -geometry "+5+5" {blue_carpet,dirt,fur,shirt}/orig.jpg textures.jpg
+```
+Sample output:
+
+![textures showcase](assets/textures.jpg)
