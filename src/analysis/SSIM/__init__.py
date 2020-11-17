@@ -1,10 +1,11 @@
 from .. import AnalyzerBase
-from skimage.metrics import mean_squared_error
+from ssim.ssimlib import SSIM
+from PIL import Image
+from skimage.metrics import structural_similarity
 import numpy as np
 
-class Analyzer(AnalyzerBase):
-    big_similar = False
 
+class Analyzer(AnalyzerBase):
     def rate(self, image, orig):
         """rate how similar image is to the original
 
@@ -13,4 +14,5 @@ class Analyzer(AnalyzerBase):
         :returns: a floating point number indicating the similarity or dissimilarity
 
         """
-        return mean_squared_error(image, orig)
+        result = structural_similarity(image, orig, data_range=255, multichannel=True)
+        return result

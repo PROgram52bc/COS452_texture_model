@@ -1,8 +1,9 @@
 import numpy
 
+
 class AnalyzerBase:
     """the bass class for any analysis algorithms"""
-    big_similar = True # Set to false if smaller number means more similar
+    big_similar = True  # Set to false if smaller number means more similar
 
     def __init__(self):
         pass
@@ -25,6 +26,12 @@ class AnalyzerBase:
         :returns: a sorted list of images
 
         """
-        orig = numpy.array(orig)
-        return sorted(images, key=lambda image: self.rate(numpy.array(image), orig), reverse=self.big_similar)
-
+        orig = numpy.array(orig, dtype=numpy.float64)
+        return sorted(
+            images,
+            key=lambda image: self.rate(
+                numpy.array(
+                    image,
+                    dtype=numpy.float64),
+                orig),
+            reverse=self.big_similar)

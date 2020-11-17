@@ -4,3 +4,5 @@ numpy
 scipy
 click
 fpdf
+pyssim
+scikit-image

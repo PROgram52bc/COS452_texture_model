@@ -122,6 +122,7 @@ def create_data_cli(cli):
                 *metric_sorted_data_dir),
             exist_ok=True)
         for metric in metrics:
+            pif(verbose, f"Metric: {metric}")
             # import the metric module
             mod = importlib.import_module(
                 '.'.join([*analysis_dir, metric]))
@@ -151,6 +152,7 @@ def create_data_cli(cli):
                         pif(verbose, f"Skipping category {category}...")
                         continue
                     for transformation in transformations:
+                        pif(verbose, f"category, transformation: {category},{transformation}...")
                         images = read_level_images(category, transformation)
                         if not images:
                             pif(verbose,
