@@ -9,7 +9,7 @@ from src.commands.sequence import decode_sequence
 from src.etc.exceptions import ModuleError, SequenceError
 from src.etc.utilities import pif, ls, is_csv, read_csv
 from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
-from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim, raw_sorted_data_dir
+from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim, raw_sorted_data_dir, seq_num_formatter
 
 
 def rank_standard(f, agents, categories, transformations, override, verbose):
@@ -53,11 +53,11 @@ def rank_standard(f, agents, categories, transformations, override, verbose):
             category, transformation = category_transformation.split(
                 csv_subfield_delim)
             # filter category and transformation
-            if category not in categories:
+            if categories and category not in categories:
                 pif(verbose,
                     f"Category {category} not specified, skipping {category}, {transformation}...")
                 continue
-            if transformation not in transformations:
+            if transformations and transformation not in transformations:
                 pif(verbose,
                     f"Transformation {transformation} not specified, skipping {category}, {transformation}...")
                 continue
@@ -142,8 +142,9 @@ def create_data_cli(cli):
                 continue
             with open(os.path.join(ROOT_DIR, *metric_sorted_data_dir, f"{metric}.csv"), 'w', newline='') as data_file:
                 writer = csv.writer(data_file)
+                # TODO: remove the subfield delimiter <2020-11-17, David Deng>
                 writer.writerow([csv_subfield_delim.join(
-                    ['CATEGORY', 'TRANSFORMATION']), *range(11)])  # header row
+                    ['CATEGORY', 'TRANSFORMATION']), *map(seq_num_formatter, range(11))])  # header row
                 for category in categories:
                     try:
                         orig = read_output(category)
@@ -152,15 +153,19 @@ def create_data_cli(cli):
                         pif(verbose, f"Skipping category {category}...")
                         continue
                     for transformation in transformations:
-                        pif(verbose, f"category, transformation: {category},{transformation}...")
+                        pif(verbose,
+                            f"category, transformation: {category},{transformation}...")
                         images = read_level_images(category, transformation)
                         if not images:
                             pif(verbose,
                                 f"no level images in {category}_{transformation}, skipping...")
                             continue
                         images = analyzer.sort(images, orig)  # sorted image
-                        order = [get_level_numeric(image.filename)
-                                 for image in images]
+                        order = [
+                            seq_num_formatter(
+                                get_level_numeric(
+                                    image.filename))
+                            for image in images]
                         writer.writerow([csv_subfield_delim.join(
                             [category, transformation]), *order])
             pif(verbose, f"data written to {path}")
@@ -171,23 +176,15 @@ def create_data_cli(cli):
                   default=get_agent_names(),
                   multiple=True,
                   type=click.Choice(get_agent_names()))
-    @click.option("-c",
-                  "--category",
-                  "categories",
-                  default=get_image_category_names(),
-                  multiple=True,
-                  type=click.Choice(get_image_category_names()))
-    @click.option("-t",
-                  "--transformation",
-                  "transformations",
-                  default=get_transformation_names(),
-                  multiple=True,
-                  type=click.Choice(get_transformation_names()))
+    @click.option("-c", "--category", "categories", default=[], multiple=True,
+                  help="a category filter, if not specified, all categories associated with the agent will be ranked")
+    @click.option("-t", "--transformation", "transformations", default=[], multiple=True,
+                  help="a transformation filter, if not specified, all transformations associated with the agent will be ranked")
     @click.option("--override/--no-override", default=True)
     @click.option("--verbose/--silent", default=True)
     @data.command()
     def rank(agents, categories, transformations, override, verbose):
-        """ Calculate spearmanrank and p-value for each metric and transformation"""
+        """ Calculate spearmanrank and p-value for each agent specified """
         path = os.path.join(ROOT_DIR, *ranked_data_dir)
         os.makedirs(path, exist_ok=True)
         file_path = os.path.join(path, "rank.csv")
@@ -196,20 +193,24 @@ def create_data_cli(cli):
             return
         with open(file_path, "w", newline='') as f:
             rank_standard(
-                f,
-                agents,
-                categories,
-                transformations,
-                override,
-                verbose)
+                f=f,
+                agents=agents,
+                categories=categories,
+                transformations=transformations,
+                override=override,
+                verbose=verbose)
         pif(verbose, f"data written into {file_path}")
 
     @click.option("-a",
                   "--raw-file",
                   "file_names",
                   multiple=True,
-                  type=click.Choice(ls(os.path.join(*raw_sorted_data_dir), filtr=is_csv, relative_to_cwd=False)),
-                  default=ls(os.path.join(*raw_sorted_data_dir), filtr=is_csv, relative_to_cwd=False))
+                  type=click.Choice(ls(os.path.join(*raw_sorted_data_dir),
+                                       filtr=is_csv,
+                                       relative_to_cwd=False)),
+                  default=ls(os.path.join(*raw_sorted_data_dir),
+                             filtr=is_csv,
+                             relative_to_cwd=False))
     @click.option("--verbose/--silent", default=True)
     @data.command('decode', help="decode raw data into human data")
     def decode_command(file_names, verbose):
@@ -220,13 +221,17 @@ def create_data_cli(cli):
             with open(output_path, "w") as output_file:
                 writer = csv.writer(output_file)
                 pif(verbose, f"Decoding {file_name}...")
-                writer.writerow(header_line)
+                writer.writerow(
+                    [header_line[0], *map(seq_num_formatter, range(1, 11))])
                 for sequence_name, *sequence in rows:
                     try:
-                        writer.writerow([sequence_name, *decode_sequence(sequence_name, sequence)])
+                        writer.writerow(
+                            [sequence_name, *decode_sequence(sequence_name, sequence)])
                     except SequenceError as e:
-                        click.echo(f"Sequence Error in {input_path}: {sequence_name}")
+                        click.echo(
+                            f"Sequence Error in {input_path}: {sequence_name}")
                         click.echo(e)
-            pif(verbose, f"Successfully written decoded sequences into {output_path}")
+            pif(verbose,
+                f"Successfully written decoded sequences into {output_path}")
 
     cli.add_command(data)

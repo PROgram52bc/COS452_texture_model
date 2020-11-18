@@ -4,7 +4,7 @@ import os
 import json
 from click import ClickException
 from src.etc.utilities import plist, read_json, write_json, pif
-from src.etc.consts import ROOT_DIR, sequence_data_dir, sequence_filename
+from src.etc.consts import ROOT_DIR, sequence_data_dir, sequence_filename, seq_num_formatter
 from src.etc.exceptions import SequenceError
 from string import ascii_lowercase, ascii_uppercase
 
@@ -54,9 +54,13 @@ def decode_sequence(sequence_name, input_sequence, strict=True):
     :sequence_name: the name of the existing sequence. If sequence_name does not exist, the input sequence is returned as is. E.g. 'wheat_noise'
     :input_sequence: the given ordering encoded with sequence_name
     :strict: raise error when detected malformed input sequences
-    :returns: the output sequence consisting of integers starting from 0
+    :returns: the output sequence consisting of integers starting from 01
 
     """
+    # TODO: extend the decode functionality
+    # 1. support namespace, implement using multiple files in the sequence directory
+    # 2. decompose this function to decode one symbol instead of an entire list
+    # 3. use cache to make repetitive lookup more efficient <2020-11-17, David Deng> #
     sequence_keys = read_sequence(sequence_name)
     if not sequence_keys:
         if strict:
@@ -72,7 +76,7 @@ def decode_sequence(sequence_name, input_sequence, strict=True):
         # given sequence must not have repetitive elements
         if input_length != set_length:
             raise SequenceError(f"Given sequence contains repetitive element")
-    sequence_map = { key: index for index, key in enumerate(sequence_keys) }
+    sequence_map = { key: seq_num_formatter(index + 1) for index, key in enumerate(sequence_keys) }
     try:
         return [ sequence_map[key] for key in input_sequence ]
     except KeyError as e:

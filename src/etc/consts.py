@@ -14,6 +14,7 @@ sequence_data_dir = ['data', 'sequence']
 sequence_filename = "sequences.json"
 printable_dir = ['printables']
 image_extensions = ['jpg', 'jpeg', 'png']
+seq_num_formatter = "{:02d}".format # usage: seq_num_formatter(int_number), will ensure a width of 2 by padding zero
 
-csv_subfield_delim = '#'  # delimiter for subfields in csv
+csv_subfield_delim = '#'  # delimiter for generic subfields in csv
 agent_name_delim = '-'  # delimiter for separating agent type from agent name
