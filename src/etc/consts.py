@@ -11,6 +11,7 @@ human_sorted_data_dir = [*sorted_data_dir, 'humans']
 raw_sorted_data_dir = [*sorted_data_dir, 'raw'] # raw human data to be decoded into human_sorted_data_dir
 ranked_data_dir = ['data', 'rank']
 sequence_data_dir = ['data', 'sequence']
+plot_data_dir = ['data', 'plot']
 sequence_filename = "sequences.json"
 printable_dir = ['printables']
 image_extensions = ['jpg', 'jpeg', 'png']

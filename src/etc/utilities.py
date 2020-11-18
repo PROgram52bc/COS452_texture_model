@@ -106,7 +106,7 @@ def read_image(path):
     return Image.open(path)
 
 
-def read_csv(path):
+def read_csv(path, reader=csv.reader):
     """read csv file as a list of rows
 
     :path: path to the csv file
@@ -114,7 +114,7 @@ def read_csv(path):
 
     """
     with open(path, newline='') as f:
-        return list(csv.reader(f))
+        return list(reader(f))
 
 
 def read_json(path):

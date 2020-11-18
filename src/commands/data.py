@@ -9,7 +9,7 @@ from src.commands.sequence import decode_sequence
 from src.etc.exceptions import ModuleError, SequenceError
 from src.etc.utilities import pif, ls, is_csv, read_csv
 from src.etc.structure import get_image_category_names, get_transformation_names, get_metric_names, get_agent_names, agent2file, read_output, read_level_images, get_level_numeric
-from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim, raw_sorted_data_dir, seq_num_formatter
+from src.etc.consts import ROOT_DIR, analysis_dir, metric_sorted_data_dir, human_sorted_data_dir, ranked_data_dir, csv_subfield_delim, raw_sorted_data_dir, seq_num_formatter, plot_data_dir, agent_name_delim
 
 
 def rank_standard(f, agents, categories, transformations, override, verbose):
@@ -233,5 +233,61 @@ def create_data_cli(cli):
                         click.echo(e)
             pif(verbose,
                 f"Successfully written decoded sequences into {output_path}")
+
+
+    # TODO: use pre-defined name and algorithm to generate data <2020-11-18, David Deng> #
+    # TODO: run the gnuplot script all together? <2020-11-18, David Deng> #
+    @click.option("-n", "--plot-name", default="clustered_hist",
+            help="the name of the pre-defined plot")
+    @data.command('plot')
+    def plot_command(plot_name):
+        """ Generate plot data files.
+
+        :plot_name: TODO
+        :returns: TODO
+
+        """
+        output_path = os.path.join(*plot_data_dir, f"{plot_name}.dat")
+        with open(output_path, "w") as output_file:
+            if plot_name == "clustered_hist":
+                metrics = {}
+                transformations = ['metric']
+            # example data
+# OrderedDict([('agent', 'metrics-MSE'), ('category', 'dirt'), ('transformation', 'zoom'), ('coefficient', '0.973'), ('p-value', '0.0')])
+# OrderedDict([('agent', 'metrics-MSE'), ('category', 'dirt'), ('transformation', 'rotate'), ('coefficient', '1.0'), ('p-value', '0.0')])
+# OrderedDict([('agent', 'metrics-MSE'), ('category', 'tree_bark'), ('transformation', 'noise'), ('coefficient', '1.0'), ('p-value', '0.0')])
+# OrderedDict([('agent', 'metrics-MSE'), ('category', 'tree_bark'), ('transformation', 'blur'), ('coefficient', '1.0'), ('p-value', '0.0')])
+                for row in read_csv(os.path.join(*ranked_data_dir, "rank.csv"), reader=csv.DictReader):
+                    agent_type, agent_name = row['agent'].split(agent_name_delim)
+                    # have different way of collecting?  <2020-11-18, David Deng> #
+                    transformation = row['transformation']
+                    p_value = float(row['p-value'])
+                    if agent_type == 'metrics':
+                        metrics.setdefault(agent_name, {}) # for the metric, collect successful numbers for each transformation
+                        metrics[agent_name].setdefault(transformation, 0) # start count at 0
+                        if transformation not in transformations:
+                            transformations.append(transformation)
+                        if p_value < 0.05:
+                            metrics[agent_name][transformation] += 1
+                writer = csv.DictWriter(output_file, fieldnames=transformations)
+                writer.writeheader()
+                for metric_name, metric_data in metrics.items():
+                    writer.writerow({ 'metric': metric_name, **metric_data })
+            elif plot_name == 'human_hist':
+                tmp_map = { 'n': 'noise', 'r': 'rotation', 'z': 'zoom', 'h': 'hue', 'b': 'blur' } # TODO: remove this dirty hack
+                transformations = {}
+                for row in read_csv(os.path.join(*ranked_data_dir, "rank.csv"), reader=csv.DictReader):
+                    agent_type, agent_name = row['agent'].split(agent_name_delim)
+                    p_value = float(row['p-value'])
+                    if agent_type == 'humans':
+                        transformation = tmp_map[row['transformation']] # TODO: remove this dirty hack
+                        transformations.setdefault(transformation, 0) # start count at 0
+                        if p_value < 0.05:
+                            transformations[transformation] += 1
+                writer = csv.writer(output_file)
+                for transformation_name, count in transformations.items():
+                    writer.writerow([transformation_name, count])
+            else:
+                raise NotImplementedError("Other plots are not implemented")
 
     cli.add_command(data)
