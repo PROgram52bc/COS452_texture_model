@@ -12,7 +12,10 @@ Some example "categories" can be: "brick," "dirt," etc.
 To add a new sample image,
 
 1. Create a directory under the `images` directory with the name of the image
-   category.
+   category. For example: 
+   ```bash
+   mkdir images/building
+   ```
 1. Copy your sample image to the `images/<category>` directory. The sample
    image must be named "orig.jpg".
 
@@ -22,6 +25,10 @@ options are available, images are resolved in the following priority:
 1. jpg
 1. jpeg
 1. png
+
+To modify the extension resolution, change the `image_extensions` variable in
+`src/etc/consts.py`. However, all specified extensions must be supported by the
+PIL library, which this framework depends on.
 
 ### Add a transformation
 
@@ -247,3 +254,12 @@ montage -geometry "+5+5" {blue_carpet,dirt,fur,shirt}/orig.jpg textures.jpg
 Sample output:
 
 ![textures showcase](assets/textures.jpg)
+
+## Shuffled textures
+
+To display all transformed textures in a single image with random order, execute the following in the `images/<category>/<transformation>/` directory:
+```bash
+montage -geometry "48x48+5+5<" -tile 5x2 $(shuf -e level_{[0][1-9],10}*.jpg | xargs echo -n ) shuffled.jpg
+```
+
+![shuffled showcase](assets/shuffled.jpg)
