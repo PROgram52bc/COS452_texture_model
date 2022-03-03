@@ -6,3 +6,4 @@ click
 fpdf
 pyssim
 scikit-image
+PyGnuplot

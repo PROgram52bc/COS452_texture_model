@@ -14,6 +14,7 @@ sequence_data_dir = ['data', 'sequence']
 plot_data_dir = ['data', 'plot']
 sequence_filename = "sequences.json"
 printable_dir = ['printables']
+graph_dir = ['graphs']
 image_extensions = ['jpg', 'jpeg', 'png']
 seq_num_formatter = "{:02d}".format # usage: seq_num_formatter(int_number), will ensure a width of 2 by padding zero
 

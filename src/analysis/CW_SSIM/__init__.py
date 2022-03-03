@@ -1,7 +1,6 @@
 from .. import AnalyzerBase
 from ssim.ssimlib import SSIM
 from PIL import Image
-from skimage.metrics import structural_similarity
 import numpy as np
 
 
